@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-bg-primary: #EEF7FF;
+    --color-bg-surface: #FFFFFF;
+    --color-bg-elevated: #F8FBFF;
+    --color-border: #D8E5F0;
+    --color-border-subtle: #E8F1F8;
+    
+    --color-text-primary: #172033;
+    --color-text-secondary: #526174;
+    --color-text-muted: #8494A7;
+
+    --color-sky-blue: #3B82F6;
+    --color-electric-blue: #2563EB;
+    --color-aqua: #14B8A6;
+    --color-green: #22C55E;
+    --color-amber: #F59E0B;
+    --color-red: #EF4444;
+    --color-purple: #8B5CF6;
+    --color-coral: #F97316;
+  }
+
+  body {
+    background-color: #EEF7FF;
+    color: #172033;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Geist", "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  code, pre, .font-mono {
+    font-family: "JetBrains Mono", "IBM Plex Mono", "SF Mono", monospace;
+  }
+}
+
+/* Custom panels and technical containers */
+.cool-panel {
+  background-color: #FFFFFF;
+  border: 1px solid #D8E5F0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.cool-panel-elevated {
+  background-color: #FFFFFF;
+  border: 1px solid #D8E5F0;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.cool-panel-soft {
+  background-color: #F8FBFF;
+  border: 1px solid #D8E5F0;
+  border-radius: 10px;
+}
+
+/* Industrial & telemetry utility wrappers */
+.industrial-panel {
+  background-color: #FFFFFF;
+  border: 1px solid #D8E5F0;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.04);
+}
+
+/* Subtle cool grid overlay */
+.cool-grid-bg {
+  background-image: radial-gradient(#d8e5f0 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Custom telemetry trace animations */
+@keyframes drawTrace {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pulseSubtle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes flowParticles {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-trace {
+  stroke-dasharray: 1000;
+  animation: drawTrace 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-subtle {
+  animation: pulseSubtle 3s ease-in-out infinite;
+}
+
+.animate-flow {
+  stroke-dasharray: 8 6;
+  animation: flowParticles 2s linear infinite;
+}
+
+/* Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #EEF7FF;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBDCEB;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A0BBD5;
+}
