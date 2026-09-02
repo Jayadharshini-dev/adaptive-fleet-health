@@ -1,3 +1,15 @@
+import sys
+import os
+
+# Guarantee backend directory and project root are in sys.path regardless of execution directory
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.dirname(CURRENT_DIR)
+PROJECT_ROOT = os.path.dirname(BACKEND_DIR)
+
+for p in [BACKEND_DIR, PROJECT_ROOT]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
 import os
 import logging
 import math
