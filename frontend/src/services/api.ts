@@ -21,21 +21,29 @@ import {
   normalizeHealthResult,
 } from './normalizers';
 
-// Central configuration
-let API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-let WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || API_BASE_URL.replace(/^http/, 'ws') + '/ws/fleet';
+function getHostName(): string {
+  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    return window.location.hostname;
+  }
+  return 'localhost';
+}
+
+let customApiBaseUrl: string | null = null;
 
 export function getApiBaseUrl(): string {
-  return API_BASE_URL;
+  if (customApiBaseUrl) return customApiBaseUrl;
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+  return `http://${getHostName()}:8000`;
 }
 
 export function setApiBaseUrl(newUrl: string): void {
-  API_BASE_URL = newUrl.replace(/\/$/, '');
-  WS_BASE_URL = API_BASE_URL.replace(/^http/, 'ws') + '/ws/fleet';
+  customApiBaseUrl = newUrl.replace(/\/$/, '');
 }
 
 export function getWsBaseUrl(): string {
-  return WS_BASE_URL;
+  if (import.meta.env.VITE_WS_BASE_URL) return import.meta.env.VITE_WS_BASE_URL;
+  if (customApiBaseUrl) return customApiBaseUrl.replace(/^http/, 'ws') + '/ws/fleet';
+  return `ws://${getHostName()}:8000/ws/fleet`;
 }
 
 // In-memory cache & fallback generator
@@ -62,7 +70,7 @@ async function fetchJson<T>(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    const url = `${getApiBaseUrl()}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
