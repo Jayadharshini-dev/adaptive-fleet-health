@@ -24,11 +24,11 @@ def run_continuous_simulator():
         ping = requests.get(f"{API_URL}/health", timeout=3.0)
         print(f"-> Backend server detected: HTTP {ping.status_code} ({API_URL})")
     except Exception as e:
-        print(f"⚠️ Warning: Could not reach backend at {API_URL} ({e}). Starting loop anyway...")
+        print(f"Warning: Could not reach backend at {API_URL} ({e}). Starting loop anyway...")
 
     # Phase 1: Rapid 12-step Warmup to establish statistical baseline envelope
-    print("
-[PHASE 1] Rapid Fleet Warmup (12 steps across all 50 devices)...")
+    print()
+    print("[PHASE 1] Rapid Fleet Warmup (12 steps across all 50 devices)...")
     for w in range(12):
         packets = sim.step()
         now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -50,16 +50,16 @@ def run_continuous_simulator():
             except Exception:
                 pass
         print(f"   -> Warmup step {w+1}/12 completed.", end="\r")
-    print("
--> Fleet baseline learning mature. All 50 devices operational.")
+    print()
+    print("-> Fleet baseline learning mature. All 50 devices operational.")
 
     # Phase 2: Inject 5 Canonical Failure Modes
-    print("
-[PHASE 2] Activating 5 Distinct Sensor Failure Behaviors:")
+    print()
+    print("[PHASE 2] Activating 5 Distinct Sensor Failure Behaviors:")
     print("   - DEV-007: Temperature Drift (Gradual +2.5°C departure)")
     print("   - DEV-014: Current Surge Spike (+35.0 A excursion)")
     print("   - DEV-021: Vibration Flatline (Zero sensor variation 0.02 mm/s)")
-    print("   - DEV-032: Vibration Oscillation (Sinusoidal ±5.5 mm/s wave)")
+    print("   - DEV-032: Vibration Oscillation (Sinusoidal +/-5.5 mm/s wave)")
     print("   - DEV-045: Sensor Swap (Discontinuous profile substitution with DEV-024)")
     print("=" * 80)
 
@@ -70,8 +70,8 @@ def run_continuous_simulator():
     sim.inject_failure("DEV-045", "sensor_swap", target_device_id="DEV-024")
 
     # Phase 3: Continuous Ingestion Loop
-    print("
-[PHASE 3] Streaming Live Fleet Telemetry to Backend (Ctrl+C to stop)...")
+    print()
+    print("[PHASE 3] Streaming Live Fleet Telemetry to Backend (Ctrl+C to stop)...")
     step = 0
     while True:
         step += 1
@@ -107,9 +107,9 @@ def run_continuous_simulator():
                     if anom != "none":
                         sev = float(data.get("severity", 0.0))
                         conf = float(data.get("confidence", 0.0))
-                        print(f"[{now_iso}] 🚨 {p.device_id:<8} | ANOMALY: {anom.upper():<12} | Status: {st:<8} | Sev: {sev:.2f} | Conf: {conf:.2f}")
+                        print(f"[{now_iso}] ALERT: {p.device_id:<8} | ANOMALY: {anom.upper():<12} | Status: {st:<8} | Sev: {sev:.2f} | Conf: {conf:.2f}")
             except Exception as e:
-                print(f"⚠️ Transmission error to {API_URL}: {e}")
+                print(f"Transmission error to {API_URL}: {e}")
                 time.sleep(1.0)
                 break
 
