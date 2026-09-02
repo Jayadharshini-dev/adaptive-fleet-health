@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { TelemetryReading, AdaptiveBaseline } from '../../types/fleet';
 import {
   ResponsiveContainer,
@@ -10,27 +10,46 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from 'recharts';
-import { Thermometer, Activity, Zap, RotateCw, Layers, Eye } from 'lucide-react';
+import { Thermometer, Activity, Zap, RotateCw, Layers } from 'lucide-react';
 import { formatTimestamp } from '../../utils/formatters';
+
+export type MetricType = 'temperature' | 'vibration' | 'current' | 'rpm' | 'all';
 
 interface TelemetryChartsProps {
   history?: TelemetryReading[];
   baseline?: AdaptiveBaseline | null;
   deviceId: string;
+  anomalyType?: string;
+  suggestedMetric?: MetricType;
   anomalyOnsetIndex?: number | null;
   detectionPointIndex?: number | null;
 }
-
-type MetricType = 'temperature' | 'vibration' | 'current' | 'rpm' | 'all';
 
 export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
   history = [],
   baseline,
   deviceId,
+  anomalyType = 'none',
+  suggestedMetric,
   anomalyOnsetIndex,
   detectionPointIndex,
 }) => {
-  const [activeMetric, setActiveMetric] = useState<MetricType>('temperature');
+  // Determine initial metric based on anomaly type if not explicitly set
+  const getInitialMetric = (): MetricType => {
+    if (suggestedMetric) return suggestedMetric;
+    const anom = anomalyType.toLowerCase();
+    if (anom === 'spike') return 'current';
+    if (anom === 'flatline' || anom === 'oscillation') return 'vibration';
+    if (anom === 'drift') return 'temperature';
+    if (anom === 'sensor_swap') return 'all';
+    return 'temperature';
+  };
+
+  const [activeMetric, setActiveMetric] = useState<MetricType>(getInitialMetric());
+
+  useEffect(() => {
+    setActiveMetric(getInitialMetric());
+  }, [anomalyType, suggestedMetric]);
 
   const configs = {
     temperature: {
@@ -40,9 +59,9 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
       color: '#dc2626',
       baselineKey: 'tempMean',
       dataKey: 'temperature',
-      yDomain: (mean: number, std: number) => [
-        Math.max(0, Math.floor(mean - std * 5)),
-        Math.ceil(mean + std * 6),
+      yDomain: (_minVal: number, maxVal: number, mean: number, std: number) => [
+        Math.max(0, Math.floor(Math.min(minVal, mean - std * 3) - 5)),
+        Math.ceil(Math.max(maxVal, mean + std * 6) + 5),
       ],
     },
     vibration: {
@@ -52,9 +71,9 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
       color: '#c2410c',
       baselineKey: 'vibMean',
       dataKey: 'vibration',
-      yDomain: (mean: number, std: number) => [
+      yDomain: (_minVal: number, maxVal: number, mean: number, std: number) => [
         0,
-        Math.max(4, Number((mean + std * 6).toFixed(1))),
+        Math.max(5.0, Math.ceil(Math.max(maxVal, mean + std * 6) + 1)),
       ],
     },
     current: {
@@ -64,9 +83,9 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
       color: '#d97706',
       baselineKey: 'currMean',
       dataKey: 'current',
-      yDomain: (mean: number, std: number) => [
-        Math.max(0, Math.floor(mean - std * 4)),
-        Math.ceil(mean + std * 6),
+      yDomain: (_minVal: number, maxVal: number, mean: number, std: number) => [
+        Math.max(0, Math.floor(Math.min(minVal, mean - std * 2) - 2)),
+        Math.ceil(Math.max(maxVal, mean + std * 8) + 5),
       ],
     },
     rpm: {
@@ -76,9 +95,9 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
       color: '#16a34a',
       baselineKey: 'rpmMean',
       dataKey: 'rpm',
-      yDomain: (mean: number, std: number) => [
-        Math.max(0, Math.floor(mean - std * 4)),
-        Math.ceil(mean + std * 6),
+      yDomain: (_minVal: number, maxVal: number, mean: number, std: number) => [
+        Math.max(0, Math.floor(Math.min(minVal, mean - std * 4) - 50)),
+        Math.ceil(Math.max(maxVal, mean + std * 6) + 50),
       ],
     },
   };
@@ -105,19 +124,19 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
       is_anomaly: item.is_anomaly,
       anomaly_label: item.anomaly_label,
       tempMean,
+      tempUpper: Number((tempMean + 2 * tempStd).toFixed(2)),
+      tempLower: Number((tempMean - 2 * tempStd).toFixed(2)),
       vibMean,
+      vibUpper: Number((vibMean + 2 * vibStd).toFixed(2)),
+      vibLower: Number((vibMean - 2 * vibStd).toFixed(2)),
       currMean,
+      currUpper: Number((currMean + 2 * currStd).toFixed(2)),
+      currLower: Number((currMean - 2 * currStd).toFixed(2)),
       rpmMean,
+      rpmUpper: Number((rpmMean + 2 * rpmStd).toFixed(1)),
+      rpmLower: Number((rpmMean - 2 * rpmStd).toFixed(1)),
     };
   });
-
-  const onsetItem = anomalyOnsetIndex !== null && anomalyOnsetIndex !== undefined && chartData[anomalyOnsetIndex]
-    ? chartData[anomalyOnsetIndex].time
-    : null;
-
-  const detectionItem = detectionPointIndex !== null && detectionPointIndex !== undefined && chartData[detectionPointIndex]
-    ? chartData[detectionPointIndex].time
-    : null;
 
   const tabs: Array<{ id: MetricType; label: string; icon: React.ElementType; unit: string; color: string }> = [
     { id: 'temperature', label: 'Temperature', icon: Thermometer, unit: '°C', color: '#dc2626' },
@@ -129,6 +148,29 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
 
   const currentConfig = activeMetric !== 'all' ? configs[activeMetric] : null;
 
+  // Calculate actual min/max across history for active metric
+  let minVal = 0;
+  let maxVal = 100;
+  if (activeMetric !== 'all' && chartData.length > 0) {
+    const vals = chartData.map((d) => Number(d[activeMetric as keyof typeof d] || 0));
+    minVal = Math.min(...vals);
+    maxVal = Math.max(...vals);
+  }
+
+  const getMeanForActive = () => {
+    if (activeMetric === 'temperature') return tempMean;
+    if (activeMetric === 'vibration') return vibMean;
+    if (activeMetric === 'current') return currMean;
+    return rpmMean;
+  };
+
+  const getStdForActive = () => {
+    if (activeMetric === 'temperature') return tempStd;
+    if (activeMetric === 'vibration') return vibStd;
+    if (activeMetric === 'current') return currStd;
+    return rpmStd;
+  };
+
   return (
     <div className="rounded border border-[#E2E0D8] bg-white p-3 font-mono">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E0D8] pb-2.5 mb-3">
@@ -136,19 +178,30 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeMetric === tab.id;
+            const isTarget =
+              (tab.id === 'temperature' && anomalyType === 'drift') ||
+              (tab.id === 'current' && anomalyType === 'spike') ||
+              (tab.id === 'vibration' && (anomalyType === 'flatline' || anomalyType === 'oscillation')) ||
+              (tab.id === 'all' && anomalyType === 'sensor_swap');
+
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveMetric(tab.id)}
                 className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-[#F0EEE6] border border-[#CFCBC0] text-[#17191C] font-bold'
+                    ? 'bg-[#F0EEE6] border border-[#CFCBC0] text-[#17191C] font-bold shadow-xs'
                     : 'text-[#59616A] hover:bg-[#F7F6F2] hover:text-[#17191C] border border-transparent'
                 }`}
               >
                 <Icon size={13} style={{ color: tab.color }} />
                 <span>{tab.label}</span>
                 {tab.unit && <span className="text-[10px] text-[#7A838C]">({tab.unit})</span>}
+                {isTarget && (
+                  <span className="ml-1 rounded bg-[#fee2e2] px-1 py-0.2 text-[9px] font-bold text-[#dc2626]">
+                    AFFECTED
+                  </span>
+                )}
               </button>
             );
           })}
@@ -166,14 +219,14 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
         </div>
       </div>
 
-      <div className="h-60 w-full">
+      <div className="h-64 w-full">
         {chartData.length === 0 ? (
           <div className="flex h-full items-center justify-center text-xs text-[#59616A]">
             No telemetry history available for {deviceId}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+            <ComposedChart data={chartData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="2 2" stroke="#E2E0D8" vertical={false} />
               <XAxis
                 dataKey="time"
@@ -188,10 +241,7 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
                 tickLine={false}
                 domain={
                   activeMetric !== 'all' && currentConfig
-                    ? currentConfig.yDomain(
-                        activeMetric === 'temperature' ? tempMean : activeMetric === 'vibration' ? vibMean : activeMetric === 'current' ? currMean : rpmMean,
-                        activeMetric === 'temperature' ? tempStd : activeMetric === 'vibration' ? vibStd : activeMetric === 'current' ? currStd : rpmStd
-                      )
+                    ? currentConfig.yDomain(minVal, maxVal, getMeanForActive(), getStdForActive())
                     : ['auto', 'auto']
                 }
               />
@@ -218,31 +268,19 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
                                 {data[currentConfig.dataKey]} {currentConfig.unit}
                               </span>
                             </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-[#7A838C]">Learned Baseline:</span>
-                              <span className="text-[#59616A]">
-                                {data[currentConfig.baselineKey]} {currentConfig.unit}
+                            <div className="flex justify-between gap-4 text-[#7A838C]">
+                              <span>Learned Baseline:</span>
+                              <span>
+                                {getMeanForActive()} {currentConfig.unit}
                               </span>
                             </div>
                           </div>
                         ) : (
-                          <div className="space-y-1">
-                            <div className="flex justify-between gap-4">
-                              <span className="text-[#dc2626]">Temp:</span>
-                              <span>{data.temperature} °C</span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-[#c2410c]">Vib:</span>
-                              <span>{data.vibration} mm/s</span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-[#d97706]">Current:</span>
-                              <span>{data.current} A</span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-[#16a34a]">RPM:</span>
-                              <span>{data.rpm} RPM</span>
-                            </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                            <div>Temp: <span className="font-bold">{data.temperature}°C</span></div>
+                            <div>Vib: <span className="font-bold">{data.vibration} mm/s</span></div>
+                            <div>Curr: <span className="font-bold">{data.current} A</span></div>
+                            <div>RPM: <span className="font-bold">{data.rpm}</span></div>
                           </div>
                         )}
                       </div>
@@ -252,118 +290,78 @@ export const TelemetryCharts: React.FC<TelemetryChartsProps> = ({
                 }}
               />
 
-              {onsetItem && (
+              {/* Baseline Reference Line */}
+              {activeMetric !== 'all' && (
                 <ReferenceLine
-                  x={onsetItem}
-                  stroke="#d97706"
-                  strokeDasharray="3 3"
-                  label={{ value: 'Onset', fill: '#d97706', fontSize: 10, position: 'top' }}
-                />
-              )}
-
-              {detectionItem && (
-                <ReferenceLine
-                  x={detectionItem}
-                  stroke="#dc2626"
+                  y={getMeanForActive()}
+                  stroke="#7A838C"
+                  strokeDasharray="4 4"
                   strokeWidth={1.5}
-                  label={{ value: 'Flagged', fill: '#dc2626', fontSize: 10, position: 'top' }}
+                  label={{
+                    value: `Baseline (${getMeanForActive()})`,
+                    fill: '#7A838C',
+                    fontSize: 9,
+                    position: 'insideBottomRight',
+                  }}
+                />
+              )}
+              {anomalyOnsetIndex !== undefined && anomalyOnsetIndex !== null && chartData[anomalyOnsetIndex] && (
+                <ReferenceLine
+                  x={chartData[anomalyOnsetIndex].time}
+                  stroke="#dc2626"
+                  strokeDasharray="3 3"
+                  label={{ value: 'Onset', fill: '#dc2626', fontSize: 9, position: 'insideTopLeft' }}
+                />
+              )}
+              {detectionPointIndex !== undefined && detectionPointIndex !== null && chartData[detectionPointIndex] && (
+                <ReferenceLine
+                  x={chartData[detectionPointIndex].time}
+                  stroke="#ea580c"
+                  strokeDasharray="2 2"
+                  label={{ value: 'Detected', fill: '#ea580c', fontSize: 9, position: 'insideTopRight' }}
                 />
               )}
 
-              {activeMetric === 'temperature' && (
-                <>
-                  <ReferenceLine
-                    y={tempMean}
-                    stroke="#7A838C"
-                    strokeDasharray="4 4"
-                    label={{ value: `Baseline: ${tempMean}°C`, fill: '#7A838C', fontSize: 9, position: 'right' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="temperature"
-                    stroke="#dc2626"
-                    strokeWidth={1.5}
-                    dot={{ r: 2, fill: '#dc2626' }}
-                    activeDot={{ r: 4, stroke: '#17191C', strokeWidth: 1 }}
-                  />
-                </>
+              {/* Single Metric Trace */}
+              {activeMetric !== 'all' && currentConfig && (
+                <Line
+                  type="monotone"
+                  dataKey={currentConfig.dataKey}
+                  stroke={currentConfig.color}
+                  strokeWidth={2.2}
+                  dot={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    if (payload && payload.is_anomaly) {
+                      return (
+                        <circle
+                          key={`dot-anom-${props.index}`}
+                          cx={cx}
+                          cy={cy}
+                          r={4}
+                          fill="#dc2626"
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                        />
+                      );
+                    }
+                    return <circle key={`dot-${props.index}`} cx={cx} cy={cy} r={1.5} fill={currentConfig.color} />;
+                  }}
+                  isAnimationActive={false}
+                />
               )}
 
-              {activeMetric === 'vibration' && (
-                <>
-                  <ReferenceLine
-                    y={vibMean}
-                    stroke="#7A838C"
-                    strokeDasharray="4 4"
-                    label={{ value: `Baseline: ${vibMean} mm/s`, fill: '#7A838C', fontSize: 9, position: 'right' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="vibration"
-                    stroke="#c2410c"
-                    strokeWidth={1.5}
-                    dot={{ r: 2, fill: '#c2410c' }}
-                    activeDot={{ r: 4, stroke: '#17191C', strokeWidth: 1 }}
-                  />
-                </>
-              )}
-
-              {activeMetric === 'current' && (
-                <>
-                  <ReferenceLine
-                    y={currMean}
-                    stroke="#7A838C"
-                    strokeDasharray="4 4"
-                    label={{ value: `Baseline: ${currMean} A`, fill: '#7A838C', fontSize: 9, position: 'right' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="current"
-                    stroke="#d97706"
-                    strokeWidth={1.5}
-                    dot={{ r: 2, fill: '#d97706' }}
-                    activeDot={{ r: 4, stroke: '#17191C', strokeWidth: 1 }}
-                  />
-                </>
-              )}
-
-              {activeMetric === 'rpm' && (
-                <>
-                  <ReferenceLine
-                    y={rpmMean}
-                    stroke="#7A838C"
-                    strokeDasharray="4 4"
-                    label={{ value: `Baseline: ${rpmMean} RPM`, fill: '#7A838C', fontSize: 9, position: 'right' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="rpm"
-                    stroke="#16a34a"
-                    strokeWidth={1.5}
-                    dot={{ r: 2, fill: '#16a34a' }}
-                    activeDot={{ r: 4, stroke: '#17191C', strokeWidth: 1 }}
-                  />
-                </>
-              )}
-
+              {/* Multi-Sensor Overlay */}
               {activeMetric === 'all' && (
                 <>
-                  <Line type="monotone" dataKey="temperature" stroke="#dc2626" strokeWidth={1.5} dot={false} name="Temperature" />
-                  <Line type="monotone" dataKey="vibration" stroke="#c2410c" strokeWidth={1.5} dot={false} name="Vibration" />
-                  <Line type="monotone" dataKey="current" stroke="#d97706" strokeWidth={1.5} dot={false} name="Current" />
+                  <Line type="monotone" dataKey="temperature" stroke="#dc2626" strokeWidth={1.8} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="vibration" stroke="#c2410c" strokeWidth={1.8} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="current" stroke="#d97706" strokeWidth={1.8} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="rpm" stroke="#16a34a" strokeWidth={1.8} dot={false} isAnimationActive={false} />
                 </>
               )}
             </ComposedChart>
           </ResponsiveContainer>
         )}
-      </div>
-
-      <div className="mt-2.5 pt-2 border-t border-[#E2E0D8] flex items-center justify-between text-[10px] text-[#59616A]">
-        <span className="flex items-center gap-1.5">
-          <Eye size={11} className="text-[#c2410c]" />
-          Adaptive per-device learned baseline.
-        </span>
-        <span>{chartData.length} observations recorded</span>
       </div>
     </div>
   );

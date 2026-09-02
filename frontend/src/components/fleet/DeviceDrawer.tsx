@@ -267,6 +267,7 @@ export const DeviceDrawer: React.FC = () => {
                 history={history}
                 baseline={activeBaseline}
                 deviceId={selectedDevice.device_id}
+                anomalyType={selectedDevice.anomaly_type}
                 anomalyOnsetIndex={selectedDevice.anomaly_onset_index}
                 detectionPointIndex={selectedDevice.detection_point_index}
               />
