@@ -1,6 +1,6 @@
 import React from 'react';
 import type { AdaptiveBaseline } from '../../types/fleet';
-import { BrainCircuit, Clock } from 'lucide-react';
+import { BrainCircuit } from 'lucide-react';
 
 interface BaselineLearningCardProps {
   baseline: AdaptiveBaseline;
@@ -8,48 +8,30 @@ interface BaselineLearningCardProps {
 
 export const BaselineLearningCard: React.FC<BaselineLearningCardProps> = ({ baseline }) => {
   const isMature = baseline.is_mature;
-  const observations = baseline.observations ?? (isMature ? 50 : 8);
-  const maxObs = baseline.max_observations ?? 15;
-  const progressPct = Math.min(100, Math.round((observations / maxObs) * 100));
+  const observations = baseline.observations ?? (isMature ? 30 : 8);
 
   return (
-    <div className={`rounded-xl border p-4 font-mono shadow-xs ${isMature ? 'border-[#BBF7D0] bg-[#F0FDF4]' : 'border-[#FDE68A] bg-[#FFFBEB]'}`}>
-      <div className="flex items-center justify-between mb-2">
+    <div className={`rounded border p-4 font-mono ${isMature ? 'border-[#bbf7d0] bg-[#f0fdf4]' : 'border-[#fde68a] bg-[#fef3c7]/50'}`}>
+      <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <BrainCircuit size={16} className={isMature ? 'text-[#15803D]' : 'text-[#B45309]'} />
-          <span className="text-xs font-bold tracking-wider uppercase text-[#172033]">
+          <BrainCircuit size={16} className={isMature ? 'text-[#16a34a]' : 'text-[#d97706]'} />
+          <span className="text-xs font-bold tracking-widest uppercase text-[#17191C]">
             {isMature ? 'BASELINE MATURE' : 'BASELINE LEARNING'}
           </span>
+          <span className="text-xs font-bold text-[#17191C]">
+            · {observations} OBSERVATIONS
+          </span>
         </div>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${isMature ? 'bg-white border-[#BBF7D0] text-[#15803D]' : 'bg-white border-[#FDE68A] text-[#B45309]'}`}>
-          {isMature ? 'MATURE' : 'TRAINING IN PROGRESS'}
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${isMature ? 'bg-white border-[#bbf7d0] text-[#16a34a]' : 'bg-white border-[#fde68a] text-[#d97706]'}`}>
+          {isMature ? 'MATURE' : 'TRAINING'}
         </span>
       </div>
 
-      <p className="text-[11px] text-[#526174] font-sans mb-2.5 leading-relaxed">
+      <p className="text-xs text-[#59616A] font-sans leading-relaxed">
         {isMature
-          ? 'Statistical health envelope established from continuous telemetry. Anomaly detectors active against individual device baseline.'
-          : 'Device is actively learning its unique operating envelope. Baseline sensitivity automatically calibrated once observation threshold is reached.'}
+          ? 'Individual device statistical envelope established. Anomaly detectors active against per-device baseline.'
+          : 'Device is actively learning its unique operating envelope. Baseline sensitivity automatically calibrated.'}
       </p>
-
-      {/* Observation count */}
-      <div className="flex items-center justify-between text-xs mb-1.5">
-        <span className="text-[#526174] flex items-center gap-1">
-          <Clock size={12} className="text-[#8494A7]" />
-          Observations:
-        </span>
-        <span className="font-bold text-[#172033]">
-          {observations} {isMature ? 'samples' : `/ ${maxObs}`}
-        </span>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="h-2 w-full rounded-full bg-white overflow-hidden border border-[#D8E5F0]">
-        <div
-          className={`h-full transition-all duration-500 rounded-full ${isMature ? 'bg-[#22C55E]' : 'bg-[#F59E0B]'}`}
-          style={{ width: `${progressPct}%` }}
-        />
-      </div>
     </div>
   );
 };

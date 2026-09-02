@@ -5,6 +5,7 @@ import { FailureTypeBadge } from '../common/FailureTypeBadge';
 import { SeverityGauge } from '../common/SeverityGauge';
 import { DetectorEvidence } from '../fleet/DetectorEvidence';
 import { ShieldCheck, HelpCircle, ArrowRight, Layers } from 'lucide-react';
+import { formatTimestamp, formatMetricValue } from '../../utils/formatters';
 
 interface AnalysisResultCardProps {
   result: HealthResult | null;
@@ -17,13 +18,13 @@ export const AnalysisResultCard: React.FC<AnalysisResultCardProps> = ({
 }) => {
   if (!result) {
     return (
-      <div className="cool-panel rounded-xl border border-[#D8E5F0] bg-white p-8 text-center font-mono shadow-xs">
-        <ShieldCheck className="mx-auto h-12 w-12 text-[#8494A7] mb-3" />
-        <h3 className="text-sm font-bold text-[#172033] uppercase">
+      <div className="rounded border border-[#E2E0D8] bg-white p-8 text-center font-mono">
+        <ShieldCheck className="mx-auto h-10 w-10 text-[#7A838C] mb-3" />
+        <h3 className="text-sm font-bold text-[#17191C] uppercase tracking-wider">
           Awaiting Telemetry Packet Submission
         </h3>
-        <p className="text-xs text-[#526174] mt-1 max-w-md mx-auto font-sans">
-          Submit single telemetry or ingest a batch feed to run Member 1’s 5-detector adaptive baseline intelligence pipeline.
+        <p className="text-xs text-[#59616A] mt-1 max-w-md mx-auto font-sans">
+          Enter telemetry metrics on the test bench to evaluate through Member 1’s 5-detector adaptive baseline intelligence pipeline.
         </p>
       </div>
     );
@@ -48,30 +49,26 @@ export const AnalysisResultCard: React.FC<AnalysisResultCardProps> = ({
   const isHealthy = status === 'HEALTHY';
 
   return (
-    <div className="cool-panel rounded-xl border border-[#D8E5F0] bg-white p-5 space-y-4 font-mono shadow-xs animate-in fade-in duration-200">
-      {/* Header */}
-      <div className="flex items-start justify-between border-b border-[#D8E5F0] pb-3">
+    <div className="rounded border border-[#E2E0D8] bg-white p-5 space-y-4 font-mono">
+      <div className="flex items-start justify-between border-b border-[#E2E0D8] pb-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-[#2563EB]">
-              TELEMETRY ANALYSIS RESULT
+            <span className="text-xs font-bold text-[#c2410c] tracking-widest uppercase">
+              SYSTEM ANALYSIS READOUT
             </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FAF5FF] border border-[#E9D5FF] text-[#7C3AED] font-bold">
-              MANUAL LAB
-            </span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${is_mature ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#FFFBEB] border-[#FDE68A] text-[#B45309]'}`}>
-              {is_mature ? 'BASELINE MATURE' : 'BASELINE LEARNING'}
+            <span className={`text-[10px] px-1.5 py-0.2 rounded border font-bold ${is_mature ? 'bg-[#f0fdf4] border-[#bbf7d0] text-[#16a34a]' : 'bg-[#fef3c7] border-[#fde68a] text-[#d97706]'}`}>
+              {is_mature ? 'BASELINE MATURE' : 'BASELINE WARMUP'}
             </span>
           </div>
 
-          <h2 className="text-lg font-bold text-[#172033] flex items-center gap-2">
+          <h2 className="text-lg font-bold text-[#17191C] flex items-center gap-2">
             {device_id}
-            <span className="text-xs font-normal text-[#526174]">
+            <span className="text-xs font-normal text-[#59616A]">
               ({device_instance_id} · {region})
             </span>
           </h2>
-          <span className="text-[11px] text-[#8494A7]">
-            Evaluated at: {new Date(timestamp).toLocaleTimeString()}
+          <span className="text-[11px] text-[#7A838C]">
+            Evaluated at: {formatTimestamp(timestamp)}
           </span>
         </div>
 
@@ -83,71 +80,62 @@ export const AnalysisResultCard: React.FC<AnalysisResultCardProps> = ({
         </div>
       </div>
 
-      {/* WHY WAS THIS DETECTED? */}
-      <div className={`rounded-xl border p-3.5 ${isHealthy ? 'border-[#BBF7D0] bg-[#F0FDF4]' : 'border-[#FDE68A] bg-[#FFFBEB]'}`}>
-        <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-1 text-[#172033]">
-          <HelpCircle size={14} className={isHealthy ? 'text-[#15803D]' : 'text-[#B45309]'} />
-          Why?
+      <div className={`rounded border p-3.5 ${isHealthy ? 'border-[#bbf7d0] bg-[#f0fdf4]' : 'border-[#fde68a] bg-[#fef3c7]/50'}`}>
+        <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider mb-1 text-[#17191C]">
+          <HelpCircle size={14} className={isHealthy ? 'text-[#16a34a]' : 'text-[#d97706]'} />
+          WHY WAS THIS FLAGGED?
         </div>
-        <p className="text-xs text-[#172033] font-sans leading-relaxed">
+        <p className="text-xs text-[#17191C] font-sans leading-relaxed">
           {explanation}
         </p>
       </div>
 
-      {/* Metrics Comparison: Current vs Learned Baseline */}
       <div>
-        <div className="text-xs font-bold text-[#172033] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <Layers size={13} className="text-[#2563EB]" />
+        <div className="text-xs font-bold text-[#17191C] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Layers size={13} className="text-[#c2410c]" />
           Key Metrics vs Learned Baseline
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-          {/* Temp */}
-          <div className="rounded-lg border border-[#D8E5F0] bg-[#F8FBFF] p-2">
-            <div className="text-[10px] text-[#526174] mb-0.5">Temperature</div>
-            <div className="font-bold text-[#172033]">{current_metrics.temperature}°C</div>
-            <div className="text-[10px] text-[#8494A7]">Base: {baseline_metrics.temperature_mean}°C</div>
+          <div className="rounded border border-[#E2E0D8] bg-[#F7F6F2] p-2">
+            <div className="text-[10px] text-[#59616A] mb-0.5">Temperature</div>
+            <div className="font-bold text-[#17191C]">{formatMetricValue('temperature', current_metrics.temperature)}</div>
+            <div className="text-[10px] text-[#7A838C]">Base: {formatMetricValue('temperature', baseline_metrics.temperature_mean)}</div>
           </div>
 
-          {/* Vib */}
-          <div className="rounded-lg border border-[#D8E5F0] bg-[#F8FBFF] p-2">
-            <div className="text-[10px] text-[#526174] mb-0.5">Vibration</div>
-            <div className="font-bold text-[#172033]">{current_metrics.vibration} mm/s</div>
-            <div className="text-[10px] text-[#8494A7]">Base: {baseline_metrics.vibration_mean} mm/s</div>
+          <div className="rounded border border-[#E2E0D8] bg-[#F7F6F2] p-2">
+            <div className="text-[10px] text-[#59616A] mb-0.5">Vibration</div>
+            <div className="font-bold text-[#17191C]">{formatMetricValue('vibration', current_metrics.vibration)}</div>
+            <div className="text-[10px] text-[#7A838C]">Base: {formatMetricValue('vibration', baseline_metrics.vibration_mean)}</div>
           </div>
 
-          {/* Current */}
-          <div className="rounded-lg border border-[#D8E5F0] bg-[#F8FBFF] p-2">
-            <div className="text-[10px] text-[#526174] mb-0.5">Current</div>
-            <div className="font-bold text-[#172033]">{current_metrics.current} A</div>
-            <div className="text-[10px] text-[#8494A7]">Base: {baseline_metrics.current_mean} A</div>
+          <div className="rounded border border-[#E2E0D8] bg-[#F7F6F2] p-2">
+            <div className="text-[10px] text-[#59616A] mb-0.5">Current</div>
+            <div className="font-bold text-[#17191C]">{formatMetricValue('current', current_metrics.current)}</div>
+            <div className="text-[10px] text-[#7A838C]">Base: {formatMetricValue('current', baseline_metrics.current_mean)}</div>
           </div>
 
-          {/* RPM */}
-          <div className="rounded-lg border border-[#D8E5F0] bg-[#F8FBFF] p-2">
-            <div className="text-[10px] text-[#526174] mb-0.5">RPM</div>
-            <div className="font-bold text-[#172033]">{Math.round(current_metrics.rpm)}</div>
-            <div className="text-[10px] text-[#8494A7]">Base: {Math.round(baseline_metrics.rpm_mean)}</div>
+          <div className="rounded border border-[#E2E0D8] bg-[#F7F6F2] p-2">
+            <div className="text-[10px] text-[#59616A] mb-0.5">RPM</div>
+            <div className="font-bold text-[#17191C]">{formatMetricValue('rpm', current_metrics.rpm)}</div>
+            <div className="text-[10px] text-[#7A838C]">Base: {formatMetricValue('rpm', baseline_metrics.rpm_mean)}</div>
           </div>
         </div>
       </div>
 
-      {/* Severity & Confidence */}
       {!isHealthy && (
         <SeverityGauge severity={severity} confidence={confidence} />
       )}
 
-      {/* Detector Evidence */}
       {detectors && (
         <DetectorEvidence evidence={detectors} anomalyType={anomaly_type} />
       )}
 
-      {/* Inspect in fleet link */}
       {onInspectDevice && (
         <div className="pt-2">
           <button
             onClick={() => onInspectDevice(device_id)}
-            className="flex items-center gap-1 text-xs text-[#2563EB] hover:text-[#1D4ED8] font-bold transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-xs text-[#c2410c] hover:underline font-bold transition-colors cursor-pointer"
           >
             <span>Open {device_id} Full Device Investigation & Historical Charts</span>
             <ArrowRight size={13} />

@@ -15,23 +15,23 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 }) => {
   const configs = {
     HEALTHY: {
-      bg: 'bg-[#F0FDF4]',
-      border: 'border-[#BBF7D0]',
-      text: 'text-[#15803D]',
+      bg: 'bg-[#f0fdf4]',
+      border: 'border-[#bbf7d0]',
+      text: 'text-[#16a34a]',
       icon: ShieldCheck,
       label: 'HEALTHY',
     },
     WARNING: {
-      bg: 'bg-[#FFFBEB]',
-      border: 'border-[#FDE68A]',
-      text: 'text-[#B45309]',
+      bg: 'bg-[#fef3c7]',
+      border: 'border-[#fde68a]',
+      text: 'text-[#d97706]',
       icon: AlertTriangle,
       label: 'WARNING',
     },
     CRITICAL: {
-      bg: 'bg-[#FEF2F2]',
-      border: 'border-[#FECACA]',
-      text: 'text-[#B91C1C]',
+      bg: 'bg-[#fee2e2]',
+      border: 'border-[#fca5a5]',
+      text: 'text-[#dc2626]',
       icon: AlertOctagon,
       label: 'CRITICAL',
     },
@@ -41,20 +41,20 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   const Icon = config.icon;
 
   const sizeClasses = {
-    sm: 'px-1.5 py-0.5 text-[11px] gap-1',
-    md: 'px-2.5 py-1 text-xs gap-1.5',
-    lg: 'px-3 py-1.5 text-sm gap-2 font-medium',
+    sm: 'px-1.5 py-0.5 text-[10px] gap-1',
+    md: 'px-2 py-0.5 text-xs gap-1.5',
+    lg: 'px-3 py-1 text-sm gap-2 font-medium',
   };
 
   const iconSizes = {
-    sm: 12,
-    md: 14,
-    lg: 16,
+    sm: 11,
+    md: 13,
+    lg: 15,
   };
 
   return (
     <span
-      className={`inline-flex items-center rounded-md border font-mono uppercase tracking-wider font-bold shadow-xs ${config.bg} ${config.border} ${config.text} ${sizeClasses[size]}`}
+      className={`inline-flex items-center rounded border font-mono uppercase tracking-wider font-bold ${config.bg} ${config.border} ${config.text} ${sizeClasses[size]}`}
     >
       {showIcon && <Icon size={iconSizes[size]} className="shrink-0" />}
       <span>{config.label}</span>

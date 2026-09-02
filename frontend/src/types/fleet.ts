@@ -101,6 +101,15 @@ export interface HealthResult {
   source?: 'LIVE' | 'MANUAL';
 }
 
+export interface UserSession {
+  id?: number;
+  username: string;
+  full_name: string;
+  role: string;
+  token?: string;
+  login_timestamp?: string;
+}
+
 /**
  * Persistent Incident / Alert Log item
  */
@@ -114,8 +123,12 @@ export interface Alert {
   severity: number;    // 0 - 100%
   confidence: number;  // 0 - 100%
   timestamp: string;
-  lifecycle_status: 'ACTIVE' | 'RESOLVED';
+  lifecycle_status: 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED';
+  acknowledged_at?: string;
+  acknowledged_by?: string;
   resolved_at?: string;
+  resolved_by?: string;
+  resolution_reason?: string;
   source: 'LIVE' | 'MANUAL';
   explanation: string;
   current_metrics: {

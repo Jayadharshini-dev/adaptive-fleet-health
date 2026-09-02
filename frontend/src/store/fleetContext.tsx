@@ -7,10 +7,10 @@ import type {
   RegionalConflict,
   DuplicateDeviceMerge,
   ConnectionStatus,
-  FleetWebSocketEvent,
   TelemetryReading,
   HealthResult,
   RegionName,
+  UserSession,
 } from '../types/fleet';
 import {
   getDevices,
@@ -19,7 +19,7 @@ import {
   getAlerts,
   getRegionalConflicts,
   getDuplicateDevices,
-  getDeviceState,
+  acknowledgeAlertApi,
   resolveAlertApi,
   resolveDuplicateDevice as apiResolveDuplicate,
 } from '../services/api';
@@ -29,6 +29,7 @@ import { fleetSimulator } from '../services/simulator';
 import { telemetryService, type TelemetryPacketInput } from '../services/telemetryService';
 
 interface FleetContextType {
+  userSession: UserSession | null;
   devicesById: Record<string, Device>;
   devicesList: Device[];
   selectedDeviceId: string | null;
@@ -43,10 +44,13 @@ interface FleetContextType {
   lastSyncTime: Date;
   isSimulatorActive: boolean;
   recentlyUpdatedId: string | null;
+  loginSession: (session: UserSession) => void;
+  logoutSession: () => void;
   setSelectedDeviceId: (id: string | null) => void;
   setSelectedAlert: (alert: Alert | null) => void;
   refreshFleet: () => Promise<void>;
-  resolveAlert: (alertId: string) => Promise<void>;
+  acknowledgeAlert: (alertId: string) => Promise<void>;
+  resolveAlert: (alertId: string, reason?: string) => Promise<void>;
   submitManualPacket: (packet: TelemetryPacketInput) => Promise<HealthResult>;
   ingestManualFeed: (jsonString: string) => Promise<HealthResult[]>;
   runDemoScenario: (scenario: 'drift' | 'spike' | 'flatline' | 'oscillation' | 'sensor_swap') => void;
@@ -57,6 +61,18 @@ interface FleetContextType {
 const FleetContext = createContext<FleetContextType | null>(null);
 
 export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [userSession, setUserSession] = useState<UserSession | null>(() => {
+    const saved = localStorage.getItem('fleet_operator');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
   const [devicesById, setDevicesById] = useState<Record<string, Device>>({});
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
@@ -82,7 +98,16 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isSimulatorActive, setIsSimulatorActive] = useState<boolean>(true);
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
 
-  // Compute fleet and region stats dynamically from normalized devicesById
+  const loginSession = useCallback((session: UserSession) => {
+    setUserSession(session);
+    localStorage.setItem('fleet_operator', JSON.stringify(session));
+  }, []);
+
+  const logoutSession = useCallback(() => {
+    setUserSession(null);
+    localStorage.removeItem('fleet_operator');
+  }, []);
+
   const recomputeSummaries = useCallback((currentMap: Record<string, Device>, currentAlerts: Alert[]) => {
     const list = Object.values(currentMap);
     if (list.length === 0) return;
@@ -90,7 +115,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const healthy = list.filter((d) => d.status === 'HEALTHY').length;
     const warning = list.filter((d) => d.status === 'WARNING').length;
     const critical = list.filter((d) => d.status === 'CRITICAL').length;
-    const activeAlerts = currentAlerts.filter((a) => a.lifecycle_status === 'ACTIVE').length;
+    const activeAlerts = currentAlerts.filter((a) => a.lifecycle_status === 'ACTIVE' || a.lifecycle_status === 'ACKNOWLEDGED').length;
 
     const affectedRegions = new Set<RegionName>();
     for (const d of list) {
@@ -126,7 +151,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     for (const alt of currentAlerts) {
-      if (alt.lifecycle_status === 'ACTIVE' && regions[alt.region]) {
+      if ((alt.lifecycle_status === 'ACTIVE' || alt.lifecycle_status === 'ACKNOWLEDGED') && regions[alt.region]) {
         regions[alt.region].active_alerts += 1;
       }
     }
@@ -134,7 +159,6 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setRegionsSummary(regions);
   }, []);
 
-  // Fetch initial fleet data from REST APIs
   const refreshFleet = useCallback(async () => {
     try {
       const [devs, summary, regSummary, alts, confs, dups] = await Promise.all([
@@ -163,44 +187,22 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  // Sync selected device state if requested
-  useEffect(() => {
-    if (!selectedDeviceId) return;
-
-    let isMounted = true;
-    getDeviceState(selectedDeviceId).then((state) => {
-      if (isMounted && state) {
-        setDevicesById((prev) => ({
-          ...prev,
-          [state.device_id]: {
-            ...(prev[state.device_id] || {}),
-            ...state,
-            history: prev[state.device_id]?.history || state.history || [],
-          },
-        }));
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedDeviceId]);
-
-  // Handle WebSocket Event Stream
-  const handleWebSocketEvent = useCallback((event: FleetWebSocketEvent) => {
+  const handleWebSocketEvent = useCallback((event: any) => {
     setLastSyncTime(new Date());
+    const eventType = event.event || event.type;
 
-    if (event.event === 'fleet_snapshot') {
+    if (eventType === 'fleet_snapshot') {
       const map: Record<string, Device> = {};
       const rawList = Array.isArray(event.devices) ? event.devices : [];
-      rawList.forEach((d) => {
+      rawList.forEach((d: any) => {
         const normalized = normalizeDevice(d);
         map[normalized.device_id] = normalized;
       });
       setDevicesById(map);
       if (event.summary) setFleetSummary(event.summary);
       if (event.regions) setRegionsSummary(event.regions);
-    } else if (event.event === 'telemetry_update') {
+      if (Array.isArray(event.alerts)) setAlerts(event.alerts.map(normalizeAlert));
+    } else if (eventType === 'telemetry_update') {
       const { device_id, reading } = event;
       setRecentlyUpdatedId(device_id);
 
@@ -223,7 +225,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           },
         };
       });
-    } else if (event.event === 'device_update') {
+    } else if (eventType === 'device_update') {
       const { device_id, status, anomaly_type, severity, confidence, explanation } = event;
       setRecentlyUpdatedId(device_id);
 
@@ -244,7 +246,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         recomputeSummaries(nextMap, alerts);
         return nextMap;
       });
-    } else if (event.event === 'alert_new') {
+    } else if (eventType === 'alert_new') {
       const newAlt = normalizeAlert(event.alert);
       setAlerts((prev) => {
         const exists = prev.some((a) => a.id === newAlt.id);
@@ -252,17 +254,41 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         recomputeSummaries(devicesById, updated);
         return updated;
       });
-    } else if (event.event === 'alert_resolved') {
+    } else if (eventType === 'alert_acknowledged') {
+      const inc = event.alert || event;
+      const targetId = event.alert_id || inc.id;
       setAlerts((prev) => {
         const updated = prev.map((a) =>
-          a.id === event.alert_id
-            ? { ...a, lifecycle_status: 'RESOLVED' as const, resolved_at: event.resolved_at }
+          a.id === targetId
+            ? {
+                ...a,
+                lifecycle_status: 'ACKNOWLEDGED' as const,
+                acknowledged_at: event.acknowledged_at || inc.acknowledged_at || new Date().toISOString(),
+                acknowledged_by: event.acknowledged_by || inc.acknowledged_by || 'Operator',
+              }
             : a
         );
         recomputeSummaries(devicesById, updated);
         return updated;
       });
-    } else if (event.event === 'conflict_update') {
+    } else if (eventType === 'alert_resolved') {
+      const targetId = event.alert_id;
+      setAlerts((prev) => {
+        const updated = prev.map((a) =>
+          a.id === targetId
+            ? {
+                ...a,
+                lifecycle_status: 'RESOLVED' as const,
+                resolved_at: event.resolved_at || new Date().toISOString(),
+                resolved_by: event.resolved_by || 'Operator',
+                resolution_reason: event.resolution_reason || 'Operator inspection completed',
+              }
+            : a
+        );
+        recomputeSummaries(devicesById, updated);
+        return updated;
+      });
+    } else if (eventType === 'conflict_update') {
       setConflicts((prev) => {
         const exists = prev.some((c) => c.id === event.conflict.id);
         return exists ? prev : [event.conflict, ...prev];
@@ -270,7 +296,6 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [alerts, devicesById, recomputeSummaries]);
 
-  // Connect WebSocket on mount
   useEffect(() => {
     wsService.onStatusChange((status) => {
       setConnectionStatus(status);
@@ -283,43 +308,59 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     wsService.connect();
     refreshFleet();
 
-    // Start subtle simulator if enabled
-    if (isSimulatorActive) {
-      fleetSimulator.start(2500);
-    }
-
     return () => {
       wsService.disconnect();
-      fleetSimulator.stop();
     };
-  }, [handleWebSocketEvent, isSimulatorActive, refreshFleet]);
+  }, [handleWebSocketEvent, refreshFleet]);
 
-  // Clear recently updated visual flash
   useEffect(() => {
     if (!recentlyUpdatedId) return;
     const timer = setTimeout(() => setRecentlyUpdatedId(null), 1200);
     return () => clearTimeout(timer);
   }, [recentlyUpdatedId]);
 
-  // Actions
-  const resolveAlert = useCallback(async (alertId: string) => {
-    await resolveAlertApi(alertId);
+  const acknowledgeAlert = useCallback(async (alertId: string) => {
+    const operatorName = userSession ? userSession.full_name : 'Operator 01';
+    await acknowledgeAlertApi(alertId, operatorName);
     setAlerts((prev) => {
       const updated = prev.map((a) =>
         a.id === alertId
-          ? { ...a, lifecycle_status: 'RESOLVED' as const, resolved_at: new Date().toISOString() }
+          ? {
+              ...a,
+              lifecycle_status: 'ACKNOWLEDGED' as const,
+              acknowledged_at: new Date().toISOString(),
+              acknowledged_by: operatorName,
+            }
           : a
       );
       recomputeSummaries(devicesById, updated);
       return updated;
     });
-  }, [devicesById, recomputeSummaries]);
+  }, [userSession, devicesById, recomputeSummaries]);
 
-  // Manual Telemetry Lab Packet Submission
+  const resolveAlert = useCallback(async (alertId: string, reason: string = 'Operator inspection completed') => {
+    const operatorName = userSession ? userSession.full_name : 'Operator 01';
+    await resolveAlertApi(alertId, operatorName, reason);
+    setAlerts((prev) => {
+      const updated = prev.map((a) =>
+        a.id === alertId
+          ? {
+              ...a,
+              lifecycle_status: 'RESOLVED' as const,
+              resolved_at: new Date().toISOString(),
+              resolved_by: operatorName,
+              resolution_reason: reason,
+            }
+          : a
+      );
+      recomputeSummaries(devicesById, updated);
+      return updated;
+    });
+  }, [userSession, devicesById, recomputeSummaries]);
+
   const submitManualPacket = useCallback(async (packet: TelemetryPacketInput): Promise<HealthResult> => {
     const result = await telemetryService.submitPacket(packet);
 
-    // If an anomaly is returned, inject it into alerts tagged with MANUAL
     if (result.status !== 'HEALTHY' && result.anomaly_type !== 'none') {
       const newAlert: Alert = {
         id: `ALT-MANUAL-${result.device_id}-${Date.now()}`,
@@ -330,7 +371,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         status: result.status,
         severity: result.severity,
         confidence: result.confidence,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        timestamp: new Date().toISOString(),
         lifecycle_status: 'ACTIVE',
         source: 'MANUAL',
         explanation: result.explanation,
@@ -346,7 +387,6 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setAlerts((prev) => [newAlert, ...prev]);
 
-      // Also update device in fleet
       setDevicesById((prev) => {
         const existing = prev[result.device_id];
         if (!existing) return prev;
@@ -376,11 +416,9 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return result;
   }, [alerts, recomputeSummaries]);
 
-  // Manual Feed Batch Ingestion
   const ingestManualFeed = useCallback(async (jsonString: string): Promise<HealthResult[]> => {
     const results = await telemetryService.ingestFeed(jsonString);
 
-    // Process any anomalies generated from feed
     const newAlerts: Alert[] = [];
     for (const res of results) {
       if (res.status !== 'HEALTHY' && res.anomaly_type !== 'none') {
@@ -393,7 +431,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           status: res.status,
           severity: res.severity,
           confidence: res.confidence,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          timestamp: new Date().toISOString(),
           lifecycle_status: 'ACTIVE',
           source: 'MANUAL',
           explanation: res.explanation,
@@ -417,19 +455,18 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const runDemoScenario = useCallback((scenario: 'drift' | 'spike' | 'flatline' | 'oscillation' | 'sensor_swap') => {
-    fleetSimulator.runDemoScenario(scenario);
+    fetch('http://127.0.0.1:8000/scenarios/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario }),
+    }).catch((err) => {
+      console.warn('Backend scenario trigger fallback to local:', err);
+      fleetSimulator.runDemoScenario(scenario);
+    });
   }, []);
 
   const toggleSimulator = useCallback(() => {
-    setIsSimulatorActive((prev) => {
-      const next = !prev;
-      if (next) {
-        fleetSimulator.start(2500);
-      } else {
-        fleetSimulator.stop();
-      }
-      return next;
-    });
+    setIsSimulatorActive((prev) => !prev);
   }, []);
 
   const resolveDuplicate = useCallback(async (duplicateId: string, action: 'keep_both' | 'merge_linked' | 'rename_secondary') => {
@@ -449,6 +486,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const value = useMemo(
     () => ({
+      userSession,
       devicesById,
       devicesList,
       selectedDeviceId,
@@ -463,9 +501,12 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       lastSyncTime,
       isSimulatorActive,
       recentlyUpdatedId,
+      loginSession,
+      logoutSession,
       setSelectedDeviceId,
       setSelectedAlert,
       refreshFleet,
+      acknowledgeAlert,
       resolveAlert,
       submitManualPacket,
       ingestManualFeed,
@@ -474,6 +515,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       resolveDuplicate,
     }),
     [
+      userSession,
       devicesById,
       devicesList,
       selectedDeviceId,
@@ -488,9 +530,12 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       lastSyncTime,
       isSimulatorActive,
       recentlyUpdatedId,
+      loginSession,
+      logoutSession,
       setSelectedDeviceId,
       setSelectedAlert,
       refreshFleet,
+      acknowledgeAlert,
       resolveAlert,
       submitManualPacket,
       ingestManualFeed,

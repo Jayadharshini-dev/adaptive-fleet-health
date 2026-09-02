@@ -274,9 +274,37 @@ export async function ingestTelemetryFeed(packets: Array<{
 }
 
 /**
+ * POST /alerts/{id}/acknowledge
+ */
+export async function acknowledgeAlertApi(alertId: string, username: string = 'Operator 01'): Promise<boolean> {
+  return fetchJson<boolean>(
+    `/alerts/${encodeURIComponent(alertId)}/acknowledge`,
+    () => true,
+    () => {
+      const found = mockState.alerts.find((a) => a.id === alertId);
+      if (found) {
+        found.lifecycle_status = 'ACKNOWLEDGED';
+        found.acknowledged_at = new Date().toISOString();
+        found.acknowledged_by = username;
+      }
+      return true;
+    },
+    2000,
+    {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    }
+  );
+}
+
+/**
  * POST /alerts/{id}/resolve
  */
-export async function resolveAlertApi(alertId: string): Promise<boolean> {
+export async function resolveAlertApi(
+  alertId: string,
+  username: string = 'Operator 01',
+  reason: string = 'Operator inspection completed'
+): Promise<boolean> {
   return fetchJson<boolean>(
     `/alerts/${encodeURIComponent(alertId)}/resolve`,
     () => true,
@@ -285,11 +313,16 @@ export async function resolveAlertApi(alertId: string): Promise<boolean> {
       if (found) {
         found.lifecycle_status = 'RESOLVED';
         found.resolved_at = new Date().toISOString();
+        found.resolved_by = username;
+        found.resolution_reason = reason;
       }
       return true;
     },
     2000,
-    { method: 'POST' }
+    {
+      method: 'POST',
+      body: JSON.stringify({ username, resolution_reason: reason }),
+    }
   );
 }
 

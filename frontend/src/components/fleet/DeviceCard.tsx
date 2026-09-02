@@ -4,6 +4,7 @@ import { StatusBadge } from '../common/StatusBadge';
 import { FailureTypeBadge } from '../common/FailureTypeBadge';
 import { MapPin, Thermometer, Activity, Zap, RotateCw, Clock, ArrowRight } from 'lucide-react';
 import { useFleetStore } from '../../store/fleetContext';
+import { formatSeverity, formatTimestamp, formatMetricValue } from '../../utils/formatters';
 
 interface DeviceCardProps {
   device: Device;
@@ -20,19 +21,18 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
   const isRecentlyUpdated = recentlyUpdatedId === device.device_id;
 
   const reading = device.latest_reading;
-  const lastTime = new Date(device.last_updated).toLocaleTimeString();
+  const lastTime = formatTimestamp(device.last_updated);
 
-  // Status border & accent treatment
   const statusAccents = {
-    HEALTHY: 'hover:border-[#86EFAC] border-[#D8E5F0] bg-white',
-    WARNING: 'border-[#FDE68A] bg-[#FFFBEB]/40 hover:border-[#FCD34D]',
-    CRITICAL: 'border-[#FECACA] bg-[#FEF2F2]/40 hover:border-[#F87171]',
+    HEALTHY: 'border-[#E2E0D8] bg-white hover:border-[#CFCBC0]',
+    WARNING: 'border-[#fde68a] bg-[#fef3c7]/30 hover:border-[#fcd34d]',
+    CRITICAL: 'border-[#fca5a5] bg-[#fee2e2]/30 hover:border-[#f87171]',
   };
 
   const topBorderAccent = {
-    HEALTHY: 'bg-[#22C55E]',
-    WARNING: 'bg-[#F59E0B]',
-    CRITICAL: 'bg-[#EF4444]',
+    HEALTHY: 'bg-[#16a34a]',
+    WARNING: 'bg-[#d97706]',
+    CRITICAL: 'bg-[#dc2626]',
   };
 
   const handleClick = () => {
@@ -45,16 +45,16 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
     return (
       <div
         onClick={handleClick}
-        className={`group relative flex items-center justify-between rounded-xl p-3 cursor-pointer transition-all duration-150 border shadow-xs ${
+        className={`group relative flex items-center justify-between rounded p-2.5 cursor-pointer transition-all border font-mono ${
           statusAccents[device.status]
-        } ${isRecentlyUpdated ? 'ring-2 ring-[#2563EB] bg-[#EFF6FF]' : ''}`}
+        } ${isRecentlyUpdated ? 'ring-1 ring-[#c2410c] bg-[#F0EEE6]' : ''}`}
       >
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-sm font-bold text-[#2563EB]">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-bold text-[#17191C]">
             {device.device_id}
           </span>
-          <span className="flex items-center gap-1 font-mono text-xs text-[#526174]">
-            <MapPin size={11} className="text-[#8494A7]" />
+          <span className="flex items-center gap-1 text-[11px] text-[#59616A]">
+            <MapPin size={10} className="text-[#7A838C]" />
             {device.region}
           </span>
           <StatusBadge status={device.status} size="sm" />
@@ -63,26 +63,26 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-4 font-mono text-xs text-[#526174]">
+        <div className="flex items-center gap-3 text-xs text-[#59616A]">
           <div>
-            <span className="text-[#8494A7]">T: </span>
-            <span className="font-bold text-[#172033]">{reading?.temperature ?? '--'}°C</span>
+            <span className="text-[#7A838C]">T: </span>
+            <span className="font-bold text-[#17191C]">{formatMetricValue('temperature', reading?.temperature)}</span>
           </div>
           <div>
-            <span className="text-[#8494A7]">V: </span>
-            <span className="font-bold text-[#172033]">{reading?.vibration ?? '--'}</span>
+            <span className="text-[#7A838C]">V: </span>
+            <span className="font-bold text-[#17191C]">{formatMetricValue('vibration', reading?.vibration)}</span>
           </div>
           <div>
-            <span className="text-[#8494A7]">I: </span>
-            <span className="font-bold text-[#172033]">{reading?.current ?? '--'}A</span>
+            <span className="text-[#7A838C]">I: </span>
+            <span className="font-bold text-[#17191C]">{formatMetricValue('current', reading?.current)}</span>
           </div>
           <div>
-            <span className="text-[#8494A7]">RPM: </span>
-            <span className="font-bold text-[#172033]">{Math.round(reading?.rpm ?? 0)}</span>
+            <span className="text-[#7A838C]">RPM: </span>
+            <span className="font-bold text-[#17191C]">{formatMetricValue('rpm', reading?.rpm)}</span>
           </div>
           {device.severity > 0 && (
-            <span className="rounded bg-[#FEF2F2] border border-[#FECACA] px-1.5 py-0.5 text-[10px] font-bold text-[#B91C1C]">
-              {device.severity}% sev
+            <span className="rounded bg-[#fee2e2] border border-[#fca5a5] px-1 py-0.2 text-[9px] font-bold text-[#dc2626]">
+              {formatSeverity(device.severity)}
             </span>
           )}
         </div>
@@ -93,92 +93,83 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
   return (
     <div
       onClick={handleClick}
-      className={`group relative flex flex-col justify-between overflow-hidden rounded-xl p-4 cursor-pointer transition-all duration-200 border shadow-xs ${
+      className={`group relative flex flex-col justify-between overflow-hidden rounded p-3.5 cursor-pointer transition-all border font-mono ${
         statusAccents[device.status]
-      } ${isRecentlyUpdated ? 'ring-2 ring-[#2563EB] bg-[#EFF6FF]' : ''}`}
+      } ${isRecentlyUpdated ? 'ring-1 ring-[#c2410c] bg-[#F0EEE6]' : ''}`}
     >
-      {/* Top status bar accent */}
-      <div className={`absolute top-0 left-0 right-0 h-[3px] ${topBorderAccent[device.status]}`} />
+      <div className={`absolute top-0 left-0 right-0 h-[2px] ${topBorderAccent[device.status]}`} />
 
-      {/* Card Header: ID, Region, Health & Severity */}
       <div>
         <div className="flex items-start justify-between">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-base font-bold text-[#172033] group-hover:text-[#2563EB] transition-colors">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-[#17191C] group-hover:text-[#c2410c] transition-colors">
                 {device.device_id}
               </span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#EEF7FF] border border-[#D8E5F0] text-[#526174]">
+              <span className="text-[10px] px-1 py-0.2 rounded bg-[#F0EEE6] border border-[#E2E0D8] text-[#59616A]">
                 {device.device_instance_id}
               </span>
             </div>
-            <div className="flex items-center gap-1 font-mono text-xs text-[#526174] mt-0.5">
-              <MapPin size={12} className="text-[#8494A7]" />
+            <div className="flex items-center gap-1 text-[11px] text-[#59616A] mt-0.5">
+              <MapPin size={11} className="text-[#7A838C]" />
               <span>{device.region} Region</span>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1">
             <StatusBadge status={device.status} size="sm" />
             {device.severity > 0 && (
-              <span className="font-mono text-[10px] font-bold text-[#B91C1C]">
-                Severity: {device.severity}%
+              <span className="text-[10px] font-bold text-[#dc2626]">
+                Sev: {formatSeverity(device.severity)}
               </span>
             )}
           </div>
         </div>
 
-        {/* Four Canonical Telemetry Metrics */}
-        <div className="grid grid-cols-4 gap-1.5 mt-3 pt-2.5 border-t border-[#D8E5F0] font-mono text-xs">
-          {/* Temperature */}
-          <div className="rounded-lg bg-[#EEF7FF] p-1.5 border border-[#D8E5F0] text-center">
-            <div className="flex items-center justify-center gap-0.5 text-[9px] text-[#526174] mb-0.5">
-              <Thermometer size={10} className="text-[#EF4444]" />
+        {/* 4 Canonical Metrics */}
+        <div className="grid grid-cols-4 gap-1 mt-3 pt-2 border-t border-[#E2E0D8] text-xs">
+          <div className="rounded bg-[#F0EEE6] p-1 border border-[#E2E0D8] text-center">
+            <div className="flex items-center justify-center gap-0.5 text-[9px] text-[#59616A] mb-0.5">
+              <Thermometer size={9} className="text-[#dc2626]" />
               <span>Temp</span>
             </div>
-            <span className="text-xs font-bold text-[#172033]">
+            <span className="text-xs font-bold text-[#17191C]">
               {reading?.temperature ?? '--'}
-              <span className="text-[9px] font-normal text-[#526174]">°C</span>
             </span>
           </div>
 
-          {/* Vibration */}
-          <div className="rounded-lg bg-[#EEF7FF] p-1.5 border border-[#D8E5F0] text-center">
-            <div className="flex items-center justify-center gap-0.5 text-[9px] text-[#526174] mb-0.5">
-              <Activity size={10} className="text-[#8B5CF6]" />
+          <div className="rounded bg-[#F0EEE6] p-1 border border-[#E2E0D8] text-center">
+            <div className="flex items-center justify-center gap-0.5 text-[9px] text-[#59616A] mb-0.5">
+              <Activity size={9} className="text-[#c2410c]" />
               <span>Vib</span>
             </div>
-            <span className="text-xs font-bold text-[#172033]">
+            <span className="text-xs font-bold text-[#17191C]">
               {reading?.vibration ?? '--'}
             </span>
           </div>
 
-          {/* Current */}
-          <div className="rounded-lg bg-[#EEF7FF] p-1.5 border border-[#D8E5F0] text-center">
-            <div className="flex items-center justify-center gap-0.5 text-[9px] text-[#526174] mb-0.5">
-              <Zap size={10} className="text-[#F59E0B]" />
+          <div className="rounded bg-[#F0EEE6] p-1 border border-[#E2E0D8] text-center">
+            <div className="flex items-center justify-center gap-0.5 text-[9px] text-[#59616A] mb-0.5">
+              <Zap size={9} className="text-[#d97706]" />
               <span>Curr</span>
             </div>
-            <span className="text-xs font-bold text-[#172033]">
+            <span className="text-xs font-bold text-[#17191C]">
               {reading?.current ?? '--'}
-              <span className="text-[9px] font-normal text-[#526174]">A</span>
             </span>
           </div>
 
-          {/* RPM */}
-          <div className="rounded-lg bg-[#EEF7FF] p-1.5 border border-[#D8E5F0] text-center">
-            <div className="flex items-center justify-center gap-0.5 text-[9px] text-[#526174] mb-0.5">
-              <RotateCw size={10} className="text-[#2563EB]" />
+          <div className="rounded bg-[#F0EEE6] p-1 border border-[#E2E0D8] text-center">
+            <div className="flex items-center justify-center gap-0.5 text-[9px] text-[#59616A] mb-0.5">
+              <RotateCw size={9} className="text-[#16a34a]" />
               <span>RPM</span>
             </div>
-            <span className="text-xs font-bold text-[#172033]">
-              {Math.round(reading?.rpm ?? 0)}
+            <span className="text-xs font-bold text-[#17191C]">
+              {reading?.rpm ? Math.round(reading.rpm) : '--'}
             </span>
           </div>
         </div>
 
-        {/* Anomaly Badge if Active */}
         {device.anomaly_type !== 'none' && (
-          <div className="mt-2.5">
+          <div className="mt-2">
             <FailureTypeBadge
               type={device.anomaly_type}
               confidence={device.confidence}
@@ -188,13 +179,12 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
         )}
       </div>
 
-      {/* Card Footer: Timestamp & Action */}
-      <div className="mt-3 pt-2 border-t border-[#D8E5F0] flex items-center justify-between font-mono text-[11px] text-[#526174]">
+      <div className="mt-2.5 pt-2 border-t border-[#E2E0D8] flex items-center justify-between text-[10px] text-[#59616A]">
         <span className="flex items-center gap-1">
-          <Clock size={11} className="text-[#8494A7]" />
+          <Clock size={10} className="text-[#7A838C]" />
           <span>{lastTime}</span>
         </span>
-        <span className="text-[#2563EB] group-hover:text-[#1D4ED8] transition-colors text-[10px] font-bold flex items-center gap-0.5">
+        <span className="text-[#c2410c] group-hover:underline font-bold flex items-center gap-0.5">
           Inspect <ArrowRight size={10} />
         </span>
       </div>

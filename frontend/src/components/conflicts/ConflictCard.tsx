@@ -3,6 +3,7 @@ import type { RegionalConflict } from '../../types/fleet';
 import { useFleetStore } from '../../store/fleetContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { AlertTriangle, Clock, Users } from 'lucide-react';
+import { formatTimestamp, formatMetricValue } from '../../utils/formatters';
 
 interface ConflictCardProps {
   conflict: RegionalConflict;
@@ -12,55 +13,52 @@ export const ConflictCard: React.FC<ConflictCardProps> = ({ conflict }) => {
   const { devicesById, setSelectedDeviceId } = useFleetStore();
 
   return (
-    <div className="cool-panel rounded-xl p-5 border border-[#FDE68A] bg-[#FFFBEB]/40 space-y-4 font-mono shadow-xs">
-      {/* Header matching Section 26 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D8E5F0] pb-3">
+    <div className="rounded border border-[#fde68a] bg-[#fef3c7]/40 p-5 space-y-4 font-mono">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E2E0D8] pb-3">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-[#FEF3C7] border border-[#FDE68A] p-2 text-[#B45309] shrink-0">
-            <AlertTriangle size={20} className="animate-pulse" />
+          <div className="rounded bg-[#fde68a] p-2 text-[#d97706] shrink-0">
+            <AlertTriangle size={18} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold uppercase tracking-wider text-[#B45309]">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#d97706]">
                 REGIONAL CONFLICT
               </span>
               <StatusBadge status={conflict.severity} size="sm" />
             </div>
-            <h3 className="text-base font-bold text-[#172033] mt-0.5">
+            <h3 className="text-base font-bold text-[#17191C] mt-0.5">
               {conflict.region} Region
             </h3>
-            <div className="flex items-center gap-3 text-xs text-[#526174] mt-1">
+            <div className="flex items-center gap-3 text-xs text-[#59616A] mt-1">
               <span className="flex items-center gap-1">
-                <Users size={12} className="text-[#8494A7]" />
+                <Users size={12} className="text-[#7A838C]" />
                 {conflict.affected_devices.length} devices showing correlated abnormal behavior
               </span>
               <span>·</span>
               <span className="flex items-center gap-1">
-                <Clock size={12} className="text-[#8494A7]" />
-                {new Date(conflict.detected_at).toLocaleTimeString()}
+                <Clock size={12} className="text-[#7A838C]" />
+                {formatTimestamp(conflict.detected_at)}
               </span>
             </div>
           </div>
         </div>
 
-        <span className="text-xs font-bold text-[#B45309] rounded-lg bg-white border border-[#FDE68A] px-2.5 py-1 self-start sm:self-center shadow-xs">
-          {conflict.conflict_type || 'CROSS-DEVICE CORRELATION'}
+        <span className="text-xs font-bold text-[#d97706] rounded bg-white border border-[#fde68a] px-2.5 py-1 self-start sm:self-center">
+          {conflict.conflict_type || 'CORRELATED DEPARTURE'}
         </span>
       </div>
 
-      {/* Explanation */}
-      <div className="rounded-xl bg-white border border-[#D8E5F0] p-3.5 shadow-xs">
-        <span className="text-[11px] font-bold uppercase text-[#526174] block mb-1">
-          Explanation & Cross-Device Mechanism
+      <div className="rounded bg-white border border-[#E2E0D8] p-3.5">
+        <span className="text-[11px] font-bold uppercase text-[#59616A] block mb-1">
+          Explanation & Cross-Device Correlation
         </span>
-        <p className="text-xs text-[#172033] font-sans leading-relaxed">
+        <p className="text-xs text-[#17191C] font-sans leading-relaxed">
           {conflict.reason}
         </p>
       </div>
 
-      {/* Affected Devices Interactive Chips */}
       <div>
-        <span className="text-xs font-bold uppercase tracking-wider text-[#526174] block mb-2">
+        <span className="text-xs font-bold uppercase tracking-wider text-[#59616A] block mb-2">
           Affected Devices (Click to inspect)
         </span>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -70,18 +68,18 @@ export const ConflictCard: React.FC<ConflictCardProps> = ({ conflict }) => {
               <div
                 key={id}
                 onClick={() => setSelectedDeviceId(id)}
-                className="flex items-center justify-between rounded-xl border border-[#D8E5F0] bg-white p-3 hover:border-[#2563EB] hover:bg-[#F8FBFF] cursor-pointer transition-all group shadow-xs"
+                className="flex items-center justify-between rounded border border-[#E2E0D8] bg-white p-3 hover:border-[#17191C] hover:bg-[#F7F6F2] cursor-pointer transition-all group"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EFF6FF] border border-[#BFDBFE] font-mono text-xs font-bold text-[#2563EB]">
+                  <div className="flex h-7 w-7 items-center justify-center rounded bg-[#17191C] font-mono text-xs font-bold text-white">
                     {id.replace('DEV-', '')}
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-[#172033] group-hover:text-[#2563EB] block">
+                    <span className="text-xs font-bold text-[#17191C] group-hover:text-[#c2410c] block">
                       {id}
                     </span>
-                    <span className="text-[11px] text-[#526174]">
-                      T: {dev?.latest_reading?.temperature ?? '--'}°C · Vib: {dev?.latest_reading?.vibration ?? '--'}
+                    <span className="text-[10px] text-[#59616A]">
+                      T: {formatMetricValue('temperature', dev?.latest_reading?.temperature)}
                     </span>
                   </div>
                 </div>

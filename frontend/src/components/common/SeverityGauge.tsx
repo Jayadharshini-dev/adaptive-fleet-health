@@ -1,43 +1,43 @@
 import React from 'react';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { formatConfidence, formatSeverity } from '../../utils/formatters';
 
 interface SeverityGaugeProps {
-  severity: number;    // 0 - 100%
-  confidence: number;  // 0 - 100%
+  severity: number;    // 0 - 1.0 or 0 - 100%
+  confidence: number;  // 0 - 1.0 or 0 - 100%
 }
 
 export const SeverityGauge: React.FC<SeverityGaugeProps> = ({
   severity,
   confidence,
 }) => {
-  const sevPercent = Math.min(100, Math.max(0, Math.round(severity)));
-  const confPercent = Math.min(100, Math.max(0, Math.round(confidence)));
+  const sevVal = severity <= 1.0 ? severity * 100 : severity;
+  const confVal = confidence <= 1.0 ? confidence * 100 : confidence;
+  const sevPercent = Math.min(100, Math.max(0, Math.round(sevVal)));
+  const confPercent = Math.min(100, Math.max(0, Math.round(confVal)));
 
-  const getSeverityColor = (val: number) => {
-    if (val >= 80) return 'bg-[#EF4444] text-[#B91C1C]';
-    if (val >= 50) return 'bg-[#F59E0B] text-[#B45309]';
-    return 'bg-[#22C55E] text-[#15803D]';
+  const getSeverityBg = (val: number) => {
+    if (val >= 70) return 'bg-[#dc2626]';
+    if (val >= 35) return 'bg-[#d97706]';
+    return 'bg-[#16a34a]';
   };
 
   return (
-    <div className="rounded-xl border border-[#D8E5F0] bg-[#F8FBFF] p-3.5 space-y-3 font-mono shadow-xs">
+    <div className="rounded border border-[#E2E0D8] bg-[#F7F6F2] p-3 space-y-3 font-mono">
       {/* Severity */}
       <div>
         <div className="flex items-center justify-between text-xs mb-1">
-          <span className="flex items-center gap-1.5 text-[#526174] font-bold">
-            <AlertCircle size={13} className="text-[#EF4444]" />
+          <span className="flex items-center gap-1.5 text-[#59616A] font-bold">
+            <AlertCircle size={13} className="text-[#dc2626]" />
             SEVERITY
           </span>
-          <span className="text-[11px] text-[#8494A7]">
-            How serious abnormality is
-          </span>
-          <span className="font-bold text-[#172033] text-sm">
-            {sevPercent}%
+          <span className="font-bold text-[#17191C]">
+            {formatSeverity(severity)}
           </span>
         </div>
-        <div className="h-2 w-full rounded-full bg-white border border-[#D8E5F0] overflow-hidden">
+        <div className="h-1.5 w-full rounded bg-[#E2E0D8] overflow-hidden">
           <div
-            className={`h-full transition-all duration-500 rounded-full ${getSeverityColor(sevPercent).split(' ')[0]}`}
+            className={`h-full transition-all duration-500 rounded ${getSeverityBg(sevPercent)}`}
             style={{ width: `${sevPercent}%` }}
           />
         </div>
@@ -46,20 +46,17 @@ export const SeverityGauge: React.FC<SeverityGaugeProps> = ({
       {/* Confidence */}
       <div>
         <div className="flex items-center justify-between text-xs mb-1">
-          <span className="flex items-center gap-1.5 text-[#526174] font-bold">
-            <CheckCircle2 size={13} className="text-[#2563EB]" />
+          <span className="flex items-center gap-1.5 text-[#59616A] font-bold">
+            <CheckCircle2 size={13} className="text-[#c2410c]" />
             CONFIDENCE
           </span>
-          <span className="text-[11px] text-[#8494A7]">
-            Evidence classification strength
-          </span>
-          <span className="font-bold text-[#172033] text-sm">
-            {confPercent}%
+          <span className="font-bold text-[#17191C]">
+            {formatConfidence(confidence)}
           </span>
         </div>
-        <div className="h-2 w-full rounded-full bg-white border border-[#D8E5F0] overflow-hidden">
+        <div className="h-1.5 w-full rounded bg-[#E2E0D8] overflow-hidden">
           <div
-            className="h-full bg-[#2563EB] transition-all duration-500 rounded-full"
+            className="h-full bg-[#c2410c] transition-all duration-500 rounded"
             style={{ width: `${confPercent}%` }}
           />
         </div>
