@@ -36,4 +36,4 @@ temp/
 # Build artifacts
 build/
 dist/
-*.egg-info/
+*.egg-info/node_modules/

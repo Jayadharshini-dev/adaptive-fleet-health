@@ -191,11 +191,16 @@ export interface RegionSummary {
 
 export interface RegionalConflict {
   id: string;
+  conflict_id?: string;
   region: RegionName;
-  severity: HealthStatus;
-  affected_devices: string[];
-  conflict_type: string;
-  reason: string;
+  severity: HealthStatus | number;
+  confidence?: number;
+  status?: 'ACTIVE' | 'RESOLVED' | string;
+  anomaly_types?: string[];
+  affected_devices: any[];
+  conflict_type?: string;
+  reason?: string;
+  explanation?: string;
   metric_divergence?: {
     metric: 'temperature' | 'vibration' | 'current' | 'rpm';
     regional_mean: number;
@@ -203,6 +208,8 @@ export interface RegionalConflict {
     deviation_pct: number;
   };
   detected_at: string;
+  last_updated_at?: string;
+  resolved_at?: string | null;
 }
 
 export interface DuplicateDeviceMerge {

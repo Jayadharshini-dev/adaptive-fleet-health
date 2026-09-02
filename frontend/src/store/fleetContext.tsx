@@ -246,20 +246,23 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         recomputeSummaries(nextMap, alerts);
         return nextMap;
       });
-    } else if (eventType === 'alert_new') {
-      const newAlt = normalizeAlert(event.alert);
+    } else if (eventType === 'alert_new' || eventType === 'incident_created' || eventType === 'alert_updated' || eventType === 'incident_updated') {
+      const rawAlt = event.alert || event.incident || event.data || event;
+      const newAlt = normalizeAlert(rawAlt);
       setAlerts((prev) => {
-        const exists = prev.some((a) => a.id === newAlt.id);
-        const updated = exists ? prev.map((a) => (a.id === newAlt.id ? newAlt : a)) : [newAlt, ...prev];
+        const exists = prev.some((a) => a.id === newAlt.id || (a.device_id === newAlt.device_id && a.device_instance_id === newAlt.device_instance_id && a.lifecycle_status !== 'RESOLVED'));
+        const updated = exists
+          ? prev.map((a) => (a.id === newAlt.id || (a.device_id === newAlt.device_id && a.device_instance_id === newAlt.device_instance_id && a.lifecycle_status !== 'RESOLVED') ? { ...a, ...newAlt } : a))
+          : [newAlt, ...prev];
         recomputeSummaries(devicesById, updated);
         return updated;
       });
-    } else if (eventType === 'alert_acknowledged') {
-      const inc = event.alert || event;
-      const targetId = event.alert_id || inc.id;
+    } else if (eventType === 'alert_acknowledged' || eventType === 'incident_acknowledged') {
+      const inc = event.alert || event.incident || event;
+      const targetId = event.alert_id || event.incident_id || inc.id;
       setAlerts((prev) => {
         const updated = prev.map((a) =>
-          a.id === targetId
+          a.id === targetId || (a.device_id === inc.device_id && a.lifecycle_status === 'ACTIVE')
             ? {
                 ...a,
                 lifecycle_status: 'ACKNOWLEDGED' as const,
@@ -271,28 +274,35 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         recomputeSummaries(devicesById, updated);
         return updated;
       });
-    } else if (eventType === 'alert_resolved') {
-      const targetId = event.alert_id;
+    } else if (eventType === 'alert_resolved' || eventType === 'incident_resolved') {
+      const inc = event.alert || event.incident || event;
+      const targetId = event.alert_id || event.incident_id || inc.id;
       setAlerts((prev) => {
         const updated = prev.map((a) =>
-          a.id === targetId
+          a.id === targetId || (a.device_id === inc.device_id && a.lifecycle_status !== 'RESOLVED')
             ? {
                 ...a,
                 lifecycle_status: 'RESOLVED' as const,
-                resolved_at: event.resolved_at || new Date().toISOString(),
-                resolved_by: event.resolved_by || 'Operator',
-                resolution_reason: event.resolution_reason || 'Operator inspection completed',
+                resolved_at: event.resolved_at || inc.resolved_at || new Date().toISOString(),
+                resolved_by: event.resolved_by || inc.resolved_by || 'Operator',
+                resolution_reason: event.resolution_reason || inc.resolution_reason || 'Operator inspection completed',
               }
             : a
         );
         recomputeSummaries(devicesById, updated);
         return updated;
       });
-    } else if (eventType === 'conflict_update') {
-      setConflicts((prev) => {
-        const exists = prev.some((c) => c.id === event.conflict.id);
-        return exists ? prev : [event.conflict, ...prev];
-      });
+    } else if (eventType === 'conflict_update' || eventType === 'regional_conflict') {
+      const rawConflict = event.conflict || event.data || event;
+      if (rawConflict && (rawConflict.conflict_id || rawConflict.id)) {
+        setConflicts((prev) => {
+          const confId = rawConflict.conflict_id || rawConflict.id;
+          const exists = prev.some((c) => c.conflict_id === confId || c.id === confId);
+          return exists
+            ? prev.map((c) => (c.conflict_id === confId || c.id === confId ? { ...c, ...rawConflict } : c))
+            : [rawConflict, ...prev];
+        });
+      }
     }
   }, [alerts, devicesById, recomputeSummaries]);
 

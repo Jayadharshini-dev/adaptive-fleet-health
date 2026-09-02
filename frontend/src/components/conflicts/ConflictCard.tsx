@@ -1,5 +1,5 @@
 import React from 'react';
-import type { RegionalConflict } from '../../types/fleet';
+import type { RegionalConflict, HealthStatus } from '../../types/fleet';
 import { useFleetStore } from '../../store/fleetContext';
 import { StatusBadge } from '../common/StatusBadge';
 import { AlertTriangle, Clock, Users } from 'lucide-react';
@@ -11,6 +11,10 @@ interface ConflictCardProps {
 
 export const ConflictCard: React.FC<ConflictCardProps> = ({ conflict }) => {
   const { devicesById, setSelectedDeviceId } = useFleetStore();
+
+  const severityStatus: HealthStatus = typeof conflict.severity === 'number'
+    ? (conflict.severity >= 0.8 ? 'CRITICAL' : 'WARNING')
+    : conflict.severity;
 
   return (
     <div className="rounded border border-[#fde68a] bg-[#fef3c7]/40 p-5 space-y-4 font-mono">
@@ -24,7 +28,7 @@ export const ConflictCard: React.FC<ConflictCardProps> = ({ conflict }) => {
               <span className="text-xs font-bold uppercase tracking-widest text-[#d97706]">
                 REGIONAL CONFLICT
               </span>
-              <StatusBadge status={conflict.severity} size="sm" />
+              <StatusBadge status={severityStatus} size="sm" />
             </div>
             <h3 className="text-base font-bold text-[#17191C] mt-0.5">
               {conflict.region} Region
