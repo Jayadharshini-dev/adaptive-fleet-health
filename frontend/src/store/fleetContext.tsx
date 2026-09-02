@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import type {
   Device,
   FleetSummary,
@@ -310,13 +310,20 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [alerts, devicesById, recomputeSummaries]);
 
+  const handleWebSocketEventRef = useRef(handleWebSocketEvent);
+  useEffect(() => {
+    handleWebSocketEventRef.current = handleWebSocketEvent;
+  }, [handleWebSocketEvent]);
+
   useEffect(() => {
     wsService.onStatusChange((status) => {
       setConnectionStatus(status);
     });
 
     wsService.onEvent((event) => {
-      handleWebSocketEvent(event);
+      if (handleWebSocketEventRef.current) {
+        handleWebSocketEventRef.current(event);
+      }
     });
 
     wsService.connect();
@@ -325,7 +332,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       wsService.disconnect();
     };
-  }, [handleWebSocketEvent, refreshFleet]);
+  }, [refreshFleet]);
 
   useEffect(() => {
     if (!recentlyUpdatedId) return;
