@@ -220,8 +220,14 @@ export function normalizeAlert(raw: any): Alert {
   const cm = raw.current_metrics || {};
   const bm = raw.baseline_metrics || {};
 
+  let lifecycle_status: 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED' = 'ACTIVE';
+  const rawLife = String(raw.lifecycle_status || raw.status || '').toUpperCase();
+  if (rawLife === 'RESOLVED') lifecycle_status = 'RESOLVED';
+  else if (rawLife === 'ACKNOWLEDGED') lifecycle_status = 'ACKNOWLEDGED';
+  else lifecycle_status = 'ACTIVE';
+
   return {
-    id: String(raw.id || `ALT-${device_id}-${anomaly_type}-${Date.now()}`),
+    id: String(raw.incident_id || raw.id || raw.alert_id || `INC-${device_id}-${Date.now()}`),
     device_id,
     device_instance_id,
     region,
@@ -229,11 +235,15 @@ export function normalizeAlert(raw: any): Alert {
     status,
     severity,
     confidence,
-    timestamp: String(raw.timestamp || new Date().toISOString()),
-    lifecycle_status: raw.lifecycle_status === 'RESOLVED' ? 'RESOLVED' : 'ACTIVE',
+    timestamp: String(raw.timestamp || raw.last_detected_at || raw.created_at || new Date().toISOString()),
+    lifecycle_status,
+    acknowledged_at: raw.acknowledged_at,
+    acknowledged_by: raw.acknowledged_by,
     resolved_at: raw.resolved_at,
+    resolved_by: raw.resolved_by,
+    resolution_reason: raw.resolution_reason,
     source: raw.source === 'MANUAL' ? 'MANUAL' : 'LIVE',
-    explanation: String(raw.explanation || 'Abnormal telemetry behavior detected by intelligence engine.'),
+    explanation: String(raw.latest_explanation || raw.explanation || 'Abnormal telemetry behavior detected by intelligence engine.'),
     current_metrics: {
       temperature: Number(cm.temperature ?? 0),
       vibration: Number(cm.vibration ?? 0),
@@ -247,7 +257,7 @@ export function normalizeAlert(raw: any): Alert {
       rpm: Number(bm.rpm ?? bm.rpm_mean ?? 0),
     },
     detectors: raw.detectors,
-    acknowledged: Boolean(raw.acknowledged),
+    acknowledged: lifecycle_status !== 'ACTIVE',
   };
 }
 

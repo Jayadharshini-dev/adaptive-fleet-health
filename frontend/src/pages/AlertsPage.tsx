@@ -4,8 +4,12 @@ import { Bell, History, Activity } from 'lucide-react';
 import { useFleetStore } from '../store/fleetContext';
 
 export const AlertsPage: React.FC = () => {
-  const { alerts, userSession } = useFleetStore();
+  const { alerts, userSession, refreshFleet } = useFleetStore();
   const [activeTab, setActiveTab] = useState<'LIVE' | 'HISTORICAL'>('LIVE');
+
+  React.useEffect(() => {
+    refreshFleet();
+  }, [refreshFleet]);
 
   const loginTime = userSession?.login_timestamp;
 

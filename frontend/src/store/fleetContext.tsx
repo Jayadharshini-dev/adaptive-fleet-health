@@ -98,15 +98,7 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isSimulatorActive, setIsSimulatorActive] = useState<boolean>(true);
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
 
-  const loginSession = useCallback((session: UserSession) => {
-    setUserSession(session);
-    localStorage.setItem('fleet_operator', JSON.stringify(session));
-  }, []);
 
-  const logoutSession = useCallback(() => {
-    setUserSession(null);
-    localStorage.removeItem('fleet_operator');
-  }, []);
 
   const recomputeSummaries = useCallback((currentMap: Record<string, Device>, currentAlerts: Alert[]) => {
     const list = Object.values(currentMap);
@@ -185,6 +177,18 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (err) {
       console.error('[FleetContext] Initial load failed:', err);
     }
+  }, []);
+
+  const loginSession = useCallback((session: UserSession) => {
+    setUserSession(session);
+    localStorage.setItem('fleet_operator', JSON.stringify(session));
+    refreshFleet();
+    wsService.connect();
+  }, [refreshFleet]);
+
+  const logoutSession = useCallback(() => {
+    setUserSession(null);
+    localStorage.removeItem('fleet_operator');
   }, []);
 
   const handleWebSocketEvent = useCallback((event: any) => {
