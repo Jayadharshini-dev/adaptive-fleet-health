@@ -1,5 +1,6 @@
 import logging
-from typing import List, Optional
+from datetime import datetime, timezone
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -8,7 +9,6 @@ from app import models, schemas, incident_service
 from app.websocket_manager import manager
 
 logger = logging.getLogger("adaptive_fleet.routes.incidents")
-
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
 
 class AcknowledgeRequest(BaseModel):
@@ -18,9 +18,18 @@ class ResolveRequest(BaseModel):
     username: Optional[str] = "Operator 01"
     reason: Optional[str] = "Operator inspection completed"
 
+def format_iso_utc(dt: Optional[datetime]) -> Optional[str]:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    # Return formatted ISO string with Z
+    return dt.isoformat().replace("+00:00", "Z")
+
 def serialize_incident_for_ui(inc: models.Incident, db: Session) -> dict:
     """Produce rich serialized incident object matching frontend expectations."""
-    # Look up latest HealthResult for metrics & evidence
     hr = (
         db.query(models.HealthResultRecord)
         .filter(
@@ -33,6 +42,8 @@ def serialize_incident_for_ui(inc: models.Incident, db: Session) -> dict:
     cm = hr.current_metrics if hr else {}
     bm = hr.baseline_metrics if hr else {}
     detectors = hr.detectors if hr else []
+
+    ts_str = format_iso_utc(inc.last_detected_at) or format_iso_utc(inc.created_at)
 
     return {
         "id": inc.incident_id,
@@ -48,17 +59,18 @@ def serialize_incident_for_ui(inc: models.Incident, db: Session) -> dict:
         "occurrence_count": inc.occurrence_count,
         "peak_severity": inc.peak_severity,
         "peak_confidence": inc.peak_confidence,
+        "is_transient": bool(inc.is_transient),
         "explanation": inc.latest_explanation or "Anomalous telemetry detected.",
         "latest_explanation": inc.latest_explanation or "Anomalous telemetry detected.",
-        "timestamp": inc.last_detected_at.isoformat() if inc.last_detected_at else inc.created_at.isoformat(),
-        "first_detected_at": inc.first_detected_at.isoformat() if inc.first_detected_at else None,
-        "last_detected_at": inc.last_detected_at.isoformat() if inc.last_detected_at else None,
-        "acknowledged_at": inc.acknowledged_at.isoformat() if inc.acknowledged_at else None,
+        "timestamp": ts_str,
+        "first_detected_at": format_iso_utc(inc.first_detected_at),
+        "last_detected_at": format_iso_utc(inc.last_detected_at),
+        "acknowledged_at": format_iso_utc(inc.acknowledged_at),
         "acknowledged_by": inc.acknowledged_by,
-        "resolved_at": inc.resolved_at.isoformat() if inc.resolved_at else None,
+        "resolved_at": format_iso_utc(inc.resolved_at),
         "resolved_by": inc.resolved_by,
         "resolution_reason": inc.resolution_reason,
-        "acknowledged": (inc.status == "ACKNOWLEDGED"),
+        "acknowledged": inc.status in ["ACKNOWLEDGED", "RESOLVED"],
         "current_metrics": cm,
         "baseline_metrics": bm,
         "detectors": detectors
@@ -93,67 +105,65 @@ def get_incidents(
         query = query.filter(models.Incident.device_instance_id == device_instance_id)
 
     incidents = query.order_by(models.Incident.last_detected_at.desc()).offset(skip).limit(limit).all()
-    return [serialize_incident_for_ui(inc, db) for inc in incidents]
+    return [serialize_incident_for_ui(i, db) for i in incidents]
 
 @router.get("/{incident_id}", summary="Get Incident by ID")
-def get_incident(incident_id: str, db: Session = Depends(get_db)):
+def get_incident_by_id(incident_id: str, db: Session = Depends(get_db)):
     inc = db.query(models.Incident).filter(
         (models.Incident.incident_id == incident_id) | (models.Incident.id == incident_id)
     ).first()
     if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident '{incident_id}' not found")
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail=f"Incident '{incident_id}' not found")
     return serialize_incident_for_ui(inc, db)
 
 @router.post("/{incident_id}/acknowledge", summary="Acknowledge Incident")
-async def acknowledge_incident_route(
+async def acknowledge_incident(
     incident_id: str,
     payload: Optional[AcknowledgeRequest] = None,
     db: Session = Depends(get_db)
 ):
-    op_name = payload.username if payload and payload.username else "Operator 01"
-    inc = incident_service.acknowledge_incident(db, incident_id, op_name)
+    operator_name = payload.username if payload and payload.username else "Operator 01"
+    inc = incident_service.acknowledge_incident(db, incident_id, operator_name)
     if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident '{incident_id}' not found")
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail=f"Incident '{incident_id}' not found or already acknowledged/resolved")
 
     serialized = serialize_incident_for_ui(inc, db)
-
-    # Broadcast to all connected WebSocket clients
     await manager.broadcast({
         "event": "alert_acknowledged",
         "type": "alert_acknowledged",
-        "alert_id": inc.incident_id,
         "incident_id": inc.incident_id,
-        "acknowledged_by": op_name,
-        "acknowledged_at": inc.acknowledged_at.isoformat() if inc.acknowledged_at else None,
-        "alert": serialized
+        "device_id": inc.device_id,
+        "operator": operator_name,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data": serialized,
+        "alert": serialized,
+        "incident": serialized
     })
-
-    return {"status": "success", "incident": serialized}
+    return serialized
 
 @router.post("/{incident_id}/resolve", summary="Resolve Incident")
-async def resolve_incident_route(
+async def resolve_incident(
     incident_id: str,
     payload: Optional[ResolveRequest] = None,
     db: Session = Depends(get_db)
 ):
-    op_name = payload.username if payload and payload.username else "Operator 01"
+    operator_name = payload.username if payload and payload.username else "Operator 01"
     reason = payload.reason if payload and payload.reason else "Operator inspection completed"
-    inc = incident_service.resolve_incident(db, incident_id, op_name, reason)
+    inc = incident_service.resolve_incident(db, incident_id, operator_name, reason)
     if not inc:
-        raise HTTPException(status_code=404, detail=f"Incident '{incident_id}' not found")
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail=f"Incident '{incident_id}' not found or already resolved")
 
     serialized = serialize_incident_for_ui(inc, db)
-
-    # Broadcast to all connected WebSocket clients
     await manager.broadcast({
         "event": "alert_resolved",
         "type": "alert_resolved",
-        "alert_id": inc.incident_id,
         "incident_id": inc.incident_id,
-        "resolved_by": op_name,
-        "resolved_at": inc.resolved_at.isoformat() if inc.resolved_at else None,
-        "resolution_reason": reason,
-        "alert": serialized
+        "device_id": inc.device_id,
+        "operator": operator_name,
+        "reason": reason,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data": serialized,
+        "alert": serialized,
+        "incident": serialized
     })
-
-    return {"status": "success", "incident": serialized}
+    return serialized

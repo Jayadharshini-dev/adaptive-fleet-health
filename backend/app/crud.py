@@ -195,3 +195,36 @@ def get_regions_summary(db: Session) -> Dict[str, Dict[str, int]]:
         if st in summary[d.region]:
             summary[d.region][st] += 1
     return summary
+
+def get_device_by_id(db: Session, device_id: str) -> Optional[models.Device]:
+    return db.query(models.Device).filter(models.Device.device_id == device_id).first()
+
+def update_device_status(db: Session, device_id: str, status: str) -> models.Device:
+    dev = db.query(models.Device).filter(models.Device.device_id == device_id).first()
+    if not dev:
+        dev = models.Device(
+            device_id=device_id,
+            device_instance_id=f"INST-{device_id.replace('DEV-', '')}",
+            region="North",
+            status=status
+        )
+        db.add(dev)
+    else:
+        dev.status = status
+    db.commit()
+    db.refresh(dev)
+    return dev
+
+def create_alert(db: Session, alert: schemas.DetectionInput) -> models.Alert:
+    db_alert = models.Alert(
+        device_id=alert.device_id,
+        device_instance_id=f"INST-{alert.device_id.replace('DEV-', '')}",
+        failure_type=alert.failure_type,
+        severity=alert.status,
+        confidence=alert.confidence,
+        timestamp=datetime.now(timezone.utc)
+    )
+    db.add(db_alert)
+    db.commit()
+    db.refresh(db_alert)
+    return db_alert

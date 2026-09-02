@@ -1,107 +1,114 @@
 import logging
-from typing import List, Optional
 from datetime import datetime, timezone
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app import crud, models, schemas
 from app.websocket_manager import manager
-from app import crud, schemas, models
-from app.routes.incidents import serialize_incident_for_ui, acknowledge_incident_route, resolve_incident_route, AcknowledgeRequest, ResolveRequest
+from app.routes.incidents import serialize_incident_for_ui, acknowledge_incident, resolve_incident, AcknowledgeRequest, ResolveRequest
 
-logger = logging.getLogger("adaptive_fleet.alerts")
-router = APIRouter(tags=["Alerts & Detections"])
-
-@router.get(
-    "/alerts",
-    summary="Get recent fleet alerts / incidents",
-    description="Retrieve all triggered anomaly alerts/incidents, ordered newest first. Supports limit."
-)
-def get_all_alerts(
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of alerts to return"),
-    device_id: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    query = db.query(models.Incident)
-    if device_id:
-        query = query.filter(models.Incident.device_id == device_id)
-    incidents = query.order_by(models.Incident.last_detected_at.desc()).limit(limit).all()
-    if incidents:
-        return [serialize_incident_for_ui(inc, db) for inc in incidents]
-    return crud.get_alerts(db=db, limit=limit)
+logger = logging.getLogger("adaptive_fleet.routes.alerts")
+router = APIRouter(tags=["Alerts & Incidents"])
 
 @router.post(
     "/detections",
     response_model=schemas.DetectionResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Receive detection result & broadcast state change (Legacy)",
-    description="Contract endpoint for legacy Person 3 Detection Engine."
+    summary="Record Detection Result (Legacy/Compatibility)",
+    description="Updates device status and creates an alert record, broadcasting device_update to WebSocket."
 )
-async def post_detection_result(
-    detection: schemas.DetectionInput,
+async def post_detection(
+    payload: schemas.DetectionInput,
     db: Session = Depends(get_db)
 ):
-    device = crud.get_device_by_id(db=db, device_id=detection.device_id)
+    device = crud.get_device_by_id(db=db, device_id=payload.device_id)
     if not device:
-        logger.warning(f"Detection rejected: device {detection.device_id} not found")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device {detection.device_id} not found"
+            detail=f"Device '{payload.device_id}' not found in fleet directory."
         )
 
     try:
-        device.status = detection.status
-        db_alert = models.Alert(
-            device_id=detection.device_id,
-            failure_type=detection.failure_type,
-            severity=detection.status,
-            confidence=detection.confidence,
-            timestamp=datetime.now(timezone.utc)
-        )
-        db.add(db_alert)
-        db.commit()
-        db.refresh(db_alert)
-        db.refresh(device)
-        logger.info(f"DB Committed: Device {device.device_id} status -> {device.status}, Alert ID={db_alert.id}")
+        device = crud.update_device_status(db=db, device_id=payload.device_id, status=payload.status)
+        alert = crud.create_alert(db=db, alert=payload)
     except Exception as e:
+        logger.error(f"Database write failure in /detections: {e}")
         db.rollback()
-        logger.error(f"DB Transaction failed for device {detection.device_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database transaction failed during detection processing"
+            detail=f"Database transaction failed: {str(e)}"
         )
 
-    event_payload = {
-        "event": "device_update",
-        "type": "device_update",
-        "device_id": device.device_id,
-        "region": device.region,
-        "status": device.status,
-        "failure_type": detection.failure_type,
-        "confidence": detection.confidence,
-        "timestamp": db_alert.timestamp.isoformat()
-    }
-    await manager.broadcast(event_payload)
-    logger.info(f"WebSocket broadcast dispatched: {event_payload['device_id']} is {event_payload['status']}")
+    try:
+        await manager.broadcast({
+            "event": "device_update",
+            "type": "device_update",
+            "device_id": device.device_id,
+            "status": device.status,
+            "failure_type": payload.failure_type,
+            "anomaly_type": payload.failure_type,
+            "severity": payload.severity if hasattr(payload, "severity") else 0.8,
+            "confidence": payload.confidence,
+            "explanation": f"Detection: {payload.failure_type} ({payload.status})",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.warning(f"WebSocket broadcast failed on detection: {e}")
 
-    return schemas.DetectionResponse(
-        message=f"Detection processed successfully for device {detection.device_id}",
-        device_id=detection.device_id,
-        status=detection.status,
-        alert=db_alert
-    )
+    return {
+        "message": "Detection result successfully processed and recorded.",
+        "device_id": device.device_id,
+        "status": device.status,
+        "alert": alert
+    }
+
+@router.get(
+    "/alerts",
+    summary="Get Operational Alerts & Incidents",
+    description="Returns all operational incidents and alerts formatted for frontend consumption."
+)
+def get_all_alerts(
+    device_id: Optional[str] = Query(None, description="Filter by device ID"),
+    severity: Optional[str] = Query(None, description="Filter by severity"),
+    limit: int = Query(100, ge=1, le=1000, description="Max alerts to return"),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Incident)
+    if device_id:
+        query = query.filter(models.Incident.device_id == device_id)
+    if severity:
+        sev_upper = severity.upper()
+        if sev_upper in ["CRITICAL", "WARNING", "HEALTHY"]:
+            if sev_upper == "CRITICAL":
+                query = query.filter(models.Incident.severity >= 0.8)
+            elif sev_upper == "WARNING":
+                query = query.filter(models.Incident.severity < 0.8)
+
+    incidents = query.order_by(models.Incident.last_detected_at.desc()).limit(limit).all()
+    return [serialize_incident_for_ui(i, db) for i in incidents]
+
+@router.get("/alerts/{alert_id}", summary="Get Alert by ID")
+def get_alert_by_id(alert_id: str, db: Session = Depends(get_db)):
+    inc = db.query(models.Incident).filter(
+        (models.Incident.incident_id == alert_id) | (models.Incident.id == alert_id)
+    ).first()
+    if not inc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Alert '{alert_id}' not found")
+    return serialize_incident_for_ui(inc, db)
 
 @router.post("/alerts/{alert_id}/acknowledge", summary="Acknowledge Alert")
-async def acknowledge_alert(
+async def acknowledge_alert_endpoint(
     alert_id: str,
     payload: Optional[AcknowledgeRequest] = None,
     db: Session = Depends(get_db)
 ):
-    return await acknowledge_incident_route(incident_id=alert_id, payload=payload, db=db)
+    return await acknowledge_incident(incident_id=alert_id, payload=payload, db=db)
 
 @router.post("/alerts/{alert_id}/resolve", summary="Resolve Alert")
-async def resolve_alert(
+async def resolve_alert_endpoint(
     alert_id: str,
     payload: Optional[ResolveRequest] = None,
     db: Session = Depends(get_db)
 ):
-    return await resolve_incident_route(incident_id=alert_id, payload=payload, db=db)
+    return await resolve_incident(incident_id=alert_id, payload=payload, db=db)

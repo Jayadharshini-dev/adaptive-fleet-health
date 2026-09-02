@@ -37,7 +37,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const baseUrl = getApiBaseUrl();
       const res = await fetch(`${baseUrl}/auth/login`, {

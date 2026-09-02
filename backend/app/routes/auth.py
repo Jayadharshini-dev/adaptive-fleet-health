@@ -57,7 +57,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
     # Server-generated authoritative login timestamp
     now = datetime.now(timezone.utc)
-    login_ts_iso = now.isoformat()
+    login_ts_iso = now.isoformat().replace("+00:00", "Z")
     session_id = f"sess_{uuid.uuid4().hex[:16]}"
     token = f"bearer-{uname}-{session_id[:8]}"
 
