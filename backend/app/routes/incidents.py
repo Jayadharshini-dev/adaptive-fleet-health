@@ -126,7 +126,7 @@ async def acknowledge_incident(
     inc = incident_service.acknowledge_incident(db, incident_id, operator_name)
     if not inc:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail=f"Incident '{incident_id}' not found or already acknowledged/resolved")
-
+    db.commit()
     serialized = serialize_incident_for_ui(inc, db)
     await manager.broadcast({
         "event": "alert_acknowledged",
@@ -152,7 +152,7 @@ async def resolve_incident(
     inc = incident_service.resolve_incident(db, incident_id, operator_name, reason)
     if not inc:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail=f"Incident '{incident_id}' not found or already resolved")
-
+    db.commit()
     serialized = serialize_incident_for_ui(inc, db)
     await manager.broadcast({
         "event": "alert_resolved",

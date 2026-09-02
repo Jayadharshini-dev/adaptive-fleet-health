@@ -900,7 +900,7 @@ def test_incident_lifecycle_creation_update_resolution_and_new_incident(client):
     assert inc_list3[0]["incident_id"] == inc1_id
     assert inc_list3[0]["occurrence_count"] >= 3
 
-    # 5. TEST 5: Return to normal (50.0) -> Incident becomes RESOLVED
+    # 5. TEST 5: Persistent incident requires operator resolution
     res_normal = client.post("/readings", json={
         "device_id": dev_id,
         "device_instance_id": inst_id,
@@ -909,6 +909,10 @@ def test_incident_lifecycle_creation_update_resolution_and_new_incident(client):
     })
     assert res_normal.status_code == 201
     assert res_normal.json()["status"] == "healthy"
+
+    # Persistent incident remains ACTIVE until operator resolution
+    res_resolve = client.post(f"/incidents/{inc1_id}/resolve", json={"username": "Operator 01", "resolution_reason": "Inspection verified"})
+    assert res_resolve.status_code == 200
 
     active_incidents = client.get(f"/incidents?device_id={dev_id}&device_instance_id={inst_id}&status=ACTIVE").json()
     assert len(active_incidents) == 0
