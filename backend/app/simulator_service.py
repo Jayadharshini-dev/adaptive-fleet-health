@@ -67,10 +67,10 @@ class BackgroundTelemetryService:
                 try:
                     for p in batch:
                         metrics_dict = {
-                            "temperature": float(p.temperature),
-                            "vibration": float(p.vibration),
-                            "current": float(p.current),
-                            "rpm": float(p.rpm)
+                            "temperature": float(p.metrics["temperature"]),
+                            "vibration": float(p.metrics["vibration"]),
+                            "current": float(p.metrics["current"]),
+                            "rpm": float(p.metrics["rpm"])
                         }
 
                         # Process through Member 1 HealthEngine
@@ -99,10 +99,10 @@ class BackgroundTelemetryService:
                             device_instance_id=p.device_instance_id,
                             region=p.region,
                             timestamp=now_utc,
-                            temperature=p.temperature,
-                            vibration=p.vibration,
-                            current=p.current,
-                            rpm=p.rpm,
+                            temperature=p.metrics['temperature'],
+                            vibration=p.metrics['vibration'],
+                            current=p.metrics['current'],
+                            rpm=p.metrics['rpm'],
                             received_at=now_utc
                         )
                         db.add(sr)
@@ -146,19 +146,19 @@ class BackgroundTelemetryService:
                             "device_instance_id": p.device_instance_id,
                             "region": p.region,
                             "timestamp": ts_iso,
-                            "temperature": p.temperature,
-                            "vibration": p.vibration,
-                            "current": p.current,
-                            "rpm": p.rpm,
+                            "temperature": p.metrics["temperature"],
+                            "vibration": p.metrics["vibration"],
+                            "current": p.metrics["current"],
+                            "rpm": p.metrics["rpm"],
                             "reading": {
                                 "device_id": p.device_id,
                                 "device_instance_id": p.device_instance_id,
                                 "region": p.region,
                                 "timestamp": ts_iso,
-                                "temperature": p.temperature,
-                                "vibration": p.vibration,
-                                "current": p.current,
-                                "rpm": p.rpm
+                                "temperature": p.metrics["temperature"],
+                                "vibration": p.metrics["vibration"],
+                                "current": p.metrics["current"],
+                                "rpm": p.metrics["rpm"]
                             }
                         })
 

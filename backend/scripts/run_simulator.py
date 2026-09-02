@@ -44,10 +44,10 @@ def run_continuous_simulator():
                 "region": p.region,
                 "timestamp": now_iso,
                 "metrics": {
-                    "temperature": float(p.temperature),
-                    "vibration": float(p.vibration),
-                    "current": float(p.current),
-                    "rpm": float(p.rpm)
+                    "temperature": float(p.metrics["temperature"]),
+                    "vibration": float(p.metrics["vibration"]),
+                    "current": float(p.metrics["current"]),
+                    "rpm": float(p.metrics["rpm"])
                 }
             }
             try:
