@@ -32,6 +32,11 @@ def compute_telemetry_freshness(latest_reading: Optional[models.SensorReading]) 
         return "OFFLINE", diff_int
 
 @router.get(
+    "/fleet/devices",
+    response_model=List[schemas.DeviceResponse],
+    include_in_schema=False
+)
+@router.get(
     "/devices",
     response_model=List[schemas.DeviceResponse],
     summary="Get all fleet devices",
@@ -53,6 +58,11 @@ def get_all_devices(
 def get_fleet_summary(db: Session = Depends(get_db)):
     return crud.get_fleet_summary(db=db)
 
+@router.get(
+    "/fleet/regions",
+    response_model=Dict[str, schemas.RegionSummaryItem],
+    include_in_schema=False
+)
 @router.get(
     "/regions/summary",
     response_model=Dict[str, schemas.RegionSummaryItem],
