@@ -42,18 +42,9 @@ async def lifespan(app: FastAPI):
             seed_database()
         else:
             logger.info(f"Database ready with {device_count} devices.")
-
-        # Start continuous real telemetry background service
-        from app.simulator_service import telemetry_bg_service
-        await telemetry_bg_service.start()
     except Exception as e:
-        logger.warning(f"Database initialization / simulator check: {e}")
+        logger.warning(f"Database initialization check: {e}")
     yield
-    try:
-        from app.simulator_service import telemetry_bg_service
-        await telemetry_bg_service.stop()
-    except Exception:
-        pass
 
 app = FastAPI(
     lifespan=lifespan,
