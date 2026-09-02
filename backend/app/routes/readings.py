@@ -275,6 +275,10 @@ async def analyze_manual_telemetry(
 
 
 @router.get(
+    "/fleet/devices/{device_id}/readings",
+    include_in_schema=False
+)
+@router.get(
     "/devices/{device_id}/readings",
     summary="Get Historical Device Readings",
     description="Returns time-series telemetry readings for a device ordered newest first."

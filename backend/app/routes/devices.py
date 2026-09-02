@@ -178,6 +178,10 @@ def get_device_health_alias(
     return get_device_state(device_id=device_id, instance_id=instance_id, db=db)
 
 @router.get(
+    "/fleet/devices/{device_id}",
+    include_in_schema=False
+)
+@router.get(
     "/devices/{device_id}",
     response_model=schemas.DeviceDetailResponse,
     summary="Get device details by ID",
@@ -190,6 +194,10 @@ def get_device_by_id(
 ):
     return crud.resolve_device_or_error(db=db, device_id=device_id, device_instance_id=instance_id)
 
+@router.get(
+    "/fleet/devices/{device_id}/baseline",
+    include_in_schema=False
+)
 @router.get(
     "/devices/{device_id}/baseline",
     response_model=schemas.BaselineResponse,

@@ -19,6 +19,8 @@ import {
   getAlerts,
   getRegionalConflicts,
   getDuplicateDevices,
+  getDeviceReadings,
+  getDeviceBaseline,
   acknowledgeAlertApi,
   resolveAlertApi,
   resolveDuplicateDevice as apiResolveDuplicate,
@@ -339,6 +341,43 @@ export const FleetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const timer = setTimeout(() => setRecentlyUpdatedId(null), 1200);
     return () => clearTimeout(timer);
   }, [recentlyUpdatedId]);
+
+  useEffect(() => {
+    if (!selectedDeviceId) return;
+    let isCancelled = false;
+
+    const loadFullDeviceHistory = async () => {
+      try {
+        const [readings, baseline] = await Promise.all([
+          getDeviceReadings(selectedDeviceId, 60),
+          getDeviceBaseline(selectedDeviceId),
+        ]);
+
+        if (isCancelled) return;
+
+        setDevicesById((prev) => {
+          const existing = prev[selectedDeviceId];
+          if (!existing) return prev;
+          const chronological = [...readings].reverse();
+          return {
+            ...prev,
+            [selectedDeviceId]: {
+              ...existing,
+              history: chronological.length > 0 ? chronological : existing.history,
+              baseline: baseline || existing.baseline,
+            },
+          };
+        });
+      } catch (err) {
+        console.warn(`[FleetContext] Failed to load full history for ${selectedDeviceId}:`, err);
+      }
+    };
+
+    loadFullDeviceHistory();
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedDeviceId]);
 
   const acknowledgeAlert = useCallback(async (alertId: string) => {
     const operatorName = userSession ? userSession.full_name : 'Operator 01';
